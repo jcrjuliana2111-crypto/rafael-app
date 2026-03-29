@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>⚡ App do Rafael</title>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#080c18;--card:#0f1624;--card2:#141e30;--border:rgba(255,255,255,.07);
+  --p1:#6C63FF;--p2:#FF6584;--p3:#43E97B;--p4:#F7971E;--p5:#4FC3F7;
+  --lua:#b06bff;--lua2:#ff6bce;--gold:#FFD700;--txt:#F0F4FF;--muted:#6B7A99;
+  --r:20px;--rs:12px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;background:var(--bg);font-family:'Nunito',sans-serif;color:var(--txt);overflow:hidden;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 70% 50% at 15% 0%,rgba(108,99,255,.15),transparent),
+             radial-gradient(ellipse 55% 40% at 85% 100%,rgba(255,101,132,.1),transparent);}
+
+/* LOADING */
+#loading{position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px;}
+.spin{width:40px;height:40px;border:3px solid rgba(108,99,255,.2);border-top-color:var(--p1);
+  border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+#load-txt{font-family:'Baloo 2',cursive;font-weight:800;font-size:1rem;color:var(--muted);}
+
+/* SETUP SCREEN */
+#setup-screen{position:fixed;inset:0;background:var(--bg);z-index:990;
+  display:none;align-items:center;justify-content:center;padding:20px;}
+.setup-box{background:var(--card);border:1.5px solid rgba(108,99,255,.3);border-radius:24px;
+  padding:28px 22px;width:100%;max-width:400px;}
+.setup-title{font-family:'Baloo 2',cursive;font-size:1.3rem;font-weight:900;margin-bottom:6px;text-align:center;}
+.setup-sub{color:var(--muted);font-size:.82rem;font-weight:600;text-align:center;margin-bottom:20px;line-height:1.5;}
+.setup-label{font-size:.8rem;font-weight:800;color:var(--muted);margin-bottom:5px;margin-top:12px;}
+.setup-input{width:100%;background:rgba(255,255,255,.06);border:1.5px solid var(--border);
+  border-radius:12px;color:var(--txt);font-family:'Nunito',sans-serif;font-weight:700;
+  font-size:.95rem;padding:11px 14px;}
+.setup-input:focus{outline:none;border-color:var(--p1);}
+.setup-btn{width:100%;margin-top:18px;background:linear-gradient(135deg,var(--p1),#a78bfa);
+  border:none;border-radius:50px;padding:13px;color:#fff;
+  font-family:'Baloo 2',cursive;font-weight:800;font-size:1rem;cursor:pointer;}
+.setup-note{font-size:.72rem;color:var(--muted);text-align:center;margin-top:10px;line-height:1.4;}
+
+/* APP SHELL */
+#app{position:relative;z-index:1;height:100vh;display:flex;flex-direction:column;max-width:480px;margin:0 auto;}
+#topbar{padding:14px 16px 8px;display:flex;align-items:center;justify-content:space-between;
+  background:linear-gradient(to bottom,var(--bg) 75%,transparent);position:sticky;top:0;z-index:10;}
+.topbar-title{font-family:'Baloo 2',cursive;font-size:1.2rem;font-weight:900;letter-spacing:.3px;}
+.top-pills{display:flex;gap:7px;}
+.pill{display:flex;align-items:center;gap:4px;border-radius:50px;padding:5px 11px;
+  font-family:'Baloo 2',cursive;font-weight:800;font-size:.85rem;}
+.pill-gold{background:linear-gradient(135deg,#1a1605,#2a2210);border:1.5px solid rgba(255,215,0,.3);color:var(--gold);}
+.pill-green{background:linear-gradient(135deg,#051a0f,#0a2218);border:1.5px solid rgba(67,233,123,.3);color:#43E97B;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#43E97B;margin-left:3px;
+  animation:syncpulse 2s ease-in-out infinite;}
+.sync-dot.err{background:var(--p2);animation:none;}
+@keyframes syncpulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+.screen{display:none;flex:1;overflow-y:auto;overflow-x:hidden;padding:12px 14px 90px;}
+.screen.active{display:block;}
+.screen::-webkit-scrollbar{width:3px;}
+.screen::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px;}
+
+#nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;
+  background:rgba(8,12,24,.95);backdrop-filter:blur(24px);
+  border-top:1px solid var(--border);display:flex;padding:6px 0 14px;z-index:20;}
+.nb{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;
+  cursor:pointer;color:var(--muted);font-family:'Nunito',sans-serif;font-size:.58rem;font-weight:800;
+  transition:color .2s;padding:4px 0;touch-action:manipulation;}
+.nb .ni{font-size:1.35rem;transition:transform .2s;}
+.nb.on{color:var(--p1);}.nb.on .ni{transform:scale(1.2);}
+
+/* CARDS */
+.hero-card{background:linear-gradient(135deg,var(--card),var(--card2));border:1px solid var(--border);
+  border-radius:var(--r);padding:20px;margin-bottom:16px;position:relative;overflow:hidden;}
+.hero-card::after{content:'⚡';position:absolute;right:-8px;top:-8px;font-size:6rem;opacity:.05;pointer-events:none;}
+.sec-title{font-family:'Baloo 2',cursive;font-size:1rem;font-weight:800;margin:16px 0 9px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--rs);padding:14px;}
+.pbar-wrap{height:6px;background:rgba(255,255,255,.07);border-radius:6px;overflow:hidden;}
+.pbar{height:100%;border-radius:6px;transition:width .6s ease;}
+
+/* GAMES GRID */
+.ggrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.gc{background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:16px 12px;cursor:pointer;transition:transform .18s,box-shadow .18s;position:relative;overflow:hidden;}
+.gc:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.4);}
+.gc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--r) var(--r) 0 0;}
+.gc.m1::before{background:linear-gradient(90deg,#6C63FF,#a78bfa);}
+.gc.m2::before{background:linear-gradient(90deg,#FF6584,#f97316);}
+.gc.m3::before{background:linear-gradient(90deg,#43E97B,#06b6d4);}
+.gc.m4::before{background:linear-gradient(90deg,#F7971E,#FFD700);}
+.gc.m5::before{background:linear-gradient(90deg,#4FC3F7,#6366f1);}
+.gc.m6::before{background:linear-gradient(90deg,#ec4899,#8b5cf6);}
+.gc.mfeel{grid-column:1/-1;background:linear-gradient(135deg,#120820,#1e0d38);border-color:rgba(176,107,255,.25);}
+.gc.mfeel::before{background:linear-gradient(90deg,#b06bff,#ff6bce);}
+.gc-icon{font-size:2rem;margin-bottom:5px;display:block;}
+.gc-name{font-family:'Baloo 2',cursive;font-weight:800;font-size:.88rem;margin-bottom:3px;}
+.gc-desc{font-size:.67rem;color:var(--muted);font-weight:600;line-height:1.3;}
+.gc-badge{margin-top:7px;display:inline-flex;align-items:center;gap:3px;
+  background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.18);
+  border-radius:50px;padding:2px 9px;font-size:.67rem;font-weight:800;color:var(--gold);}
+
+/* TASKS */
+.filter-row{display:flex;gap:6px;margin-bottom:11px;overflow-x:auto;padding-bottom:2px;}
+.filter-row::-webkit-scrollbar{display:none;}
+.fbtn{font-family:'Nunito',sans-serif;font-size:.7rem;font-weight:800;
+  background:var(--card);border:1.5px solid var(--border);border-radius:50px;
+  padding:5px 12px;cursor:pointer;color:var(--muted);white-space:nowrap;transition:all .15s;}
+.fbtn.on{background:var(--p1);border-color:var(--p1);color:#fff;}
+.tcard{background:var(--card);border:1px solid var(--border);border-radius:var(--rs);
+  padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:11px;
+  transition:all .2s;cursor:pointer;}
+.tcard.done{opacity:.45;pointer-events:none;}
+.tcard:not(.done):hover{border-color:rgba(108,99,255,.4);transform:translateX(3px);}
+.temoji{font-size:1.8rem;flex-shrink:0;}
+.tinfo{flex:1;}
+.tname{font-weight:800;font-size:.88rem;margin-bottom:2px;}
+.tdesc{font-size:.68rem;color:var(--muted);font-weight:600;}
+.treward{display:flex;flex-direction:column;align-items:center;gap:1px;
+  background:rgba(255,215,0,.07);border:1px solid rgba(255,215,0,.16);
+  border-radius:10px;padding:6px 10px;flex-shrink:0;text-align:center;}
+.treward .tv{font-family:'Baloo 2',cursive;font-weight:900;font-size:.95rem;color:var(--gold);}
+.treward .tl{font-size:.55rem;color:var(--muted);font-weight:700;}
+.tchk{width:24px;height:24px;border-radius:50%;border:2px solid var(--p1);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;font-size:.75rem;}
+.tchk.on{background:var(--p1);}
+
+/* COURAGE */
+.ccat-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.ccard{background:var(--card);border:1.5px solid var(--border);border-radius:14px;
+  padding:14px;margin-bottom:8px;}
+.ccard.donec{border-color:rgba(67,233,123,.3);opacity:.6;}
+.lua-quote{background:rgba(176,107,255,.08);border-left:3px solid var(--lua);
+  border-radius:0 8px 8px 0;padding:8px 11px;margin:7px 0;
+  font-size:.74rem;color:#dcc8ff;font-weight:600;line-height:1.5;font-style:italic;}
+.tip-q{font-size:.7rem;color:#a0ffc8;font-weight:600;margin-bottom:7px;}
+.cbtn{border:none;border-radius:50px;padding:7px 17px;color:#fff;
+  font-family:'Baloo 2',cursive;font-weight:800;font-size:.78rem;cursor:pointer;transition:all .15s;}
+
+/* MESADA */
+.rw-hero{background:linear-gradient(135deg,#0d0a1a,#1a1035);border:1.5px solid rgba(255,215,0,.2);
+  border-radius:var(--r);padding:22px 18px;text-align:center;margin-bottom:14px;position:relative;overflow:hidden;}
+.rw-hero::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 50% 0%,rgba(255,215,0,.08),transparent 65%);}
+.rw-num{font-family:'Baloo 2',cursive;font-size:3rem;font-weight:900;color:var(--gold);line-height:1;}
+.money-box{margin-top:12px;background:rgba(67,233,123,.08);border:1.5px solid rgba(67,233,123,.25);
+  border-radius:12px;padding:11px 18px;display:inline-flex;align-items:center;gap:10px;}
+.money-val{font-family:'Baloo 2',cursive;font-size:1.5rem;font-weight:900;color:#43E97B;}
+
+/* RATEIO */
+.rateio-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:12px;}
+.rateio-card h3{font-family:'Baloo 2',cursive;font-size:1rem;font-weight:800;margin-bottom:14px;color:var(--gold);}
+.rateio-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+.rateio-row:last-child{border:none;}
+.rateio-ico{font-size:1.4rem;width:30px;text-align:center;flex-shrink:0;}
+.rateio-info{flex:1;}
+.rateio-name{font-weight:800;font-size:.85rem;}
+.rateio-stars{font-size:.7rem;color:var(--muted);font-weight:600;margin-top:1px;}
+.rateio-val{font-family:'Baloo 2',cursive;font-weight:900;font-size:1.05rem;color:#43E97B;flex-shrink:0;}
+.rateio-bar-wrap{height:4px;background:rgba(255,255,255,.06);border-radius:4px;margin-top:4px;overflow:hidden;}
+.rateio-bar{height:100%;border-radius:4px;}
+
+.cfg-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px;}
+.cfg-card h3{font-family:'Baloo 2',cursive;font-size:.95rem;font-weight:800;margin-bottom:10px;}
+.cfg-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);}
+.cfg-row:last-child{border:none;}
+.cfg-name{font-size:.8rem;font-weight:700;flex:1;padding-right:8px;}
+.cfg-input{background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;
+  color:var(--txt);font-family:'Nunito',sans-serif;font-weight:800;font-size:.88rem;
+  width:70px;padding:5px 8px;text-align:center;}
+.cfg-input:focus{outline:none;border-color:var(--p1);}
+.month-prog{height:12px;background:rgba(255,255,255,.06);border-radius:50px;overflow:hidden;margin:8px 0;}
+.month-fill{height:100%;background:linear-gradient(90deg,#FFD700,#FFA500);border-radius:50px;transition:width .8s;}
+.pay-btn{width:100%;margin-top:10px;background:linear-gradient(135deg,#43E97B,#06b6d4);
+  border:none;border-radius:50px;padding:12px;color:#fff;
+  font-family:'Baloo 2',cursive;font-weight:800;font-size:.95rem;cursor:pointer;transition:all .15s;}
+.pay-btn:hover{transform:translateY(-2px);}
+.pay-btn:disabled{opacity:.4;transform:none;cursor:not-allowed;}
+
+/* PROFILE */
+.prof-hero{background:linear-gradient(135deg,var(--card),var(--card2));border:1px solid var(--border);
+  border-radius:var(--r);padding:22px 18px;text-align:center;margin-bottom:14px;}
+.avatar{width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,var(--p1),var(--p2));
+  display:flex;align-items:center;justify-content:center;font-size:2.3rem;
+  margin:0 auto 10px;box-shadow:0 0 0 4px rgba(108,99,255,.25);}
+.prof-name{font-family:'Baloo 2',cursive;font-size:1.45rem;font-weight:900;}
+.prof-lvl{display:inline-block;background:linear-gradient(135deg,var(--p1),#a78bfa);
+  border-radius:50px;padding:3px 14px;font-size:.77rem;font-weight:800;margin-top:5px;}
+.stats-g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+.stat-b{background:var(--card);border:1px solid var(--border);border-radius:var(--rs);padding:12px 8px;text-align:center;}
+.stat-v{font-family:'Baloo 2',cursive;font-size:1.25rem;font-weight:900;color:var(--gold);}
+.stat-l{font-size:.6rem;color:var(--muted);font-weight:700;margin-top:2px;}
+.ach-item{background:var(--card);border:1px solid var(--border);border-radius:var(--rs);
+  padding:11px 13px;display:flex;align-items:center;gap:10px;margin-bottom:7px;}
+.ach-item.locked{opacity:.3;}
+
+/* MAMA */
+.mama-lock{background:linear-gradient(135deg,#100820,#1e1040);border:2px solid rgba(176,107,255,.3);
+  border-radius:var(--r);padding:26px 18px;text-align:center;margin-bottom:14px;}
+.pin-row{display:flex;gap:8px;justify-content:center;margin:12px 0;}
+.pin-in{width:44px;height:52px;border-radius:12px;background:rgba(255,255,255,.06);
+  border:2px solid rgba(176,107,255,.3);color:#fff;font-family:'Baloo 2',cursive;
+  font-weight:900;font-size:1.4rem;text-align:center;}
+.pin-in:focus{outline:none;border-color:var(--lua);background:rgba(176,107,255,.1);}
+.unlock-btn{font-family:'Baloo 2',cursive;font-weight:800;font-size:1rem;
+  background:linear-gradient(135deg,var(--lua),var(--lua2));color:#fff;border:none;
+  border-radius:50px;padding:11px 30px;cursor:pointer;box-shadow:0 4px 16px rgba(176,107,255,.35);}
+.rpt-card{background:var(--card);border:1px solid var(--border);border-radius:var(--rs);margin-bottom:9px;overflow:hidden;}
+.rpt-hdr{padding:11px 15px;background:linear-gradient(90deg,rgba(176,107,255,.12),rgba(255,107,206,.08));
+  display:flex;align-items:center;justify-content:space-between;}
+.rpt-body{padding:13px 15px;}
+.rpt-advice{background:rgba(67,233,123,.06);border-left:3px solid var(--p3);border-radius:0 8px 8px 0;
+  padding:9px 12px;margin-top:9px;font-size:.77rem;color:#a0ffc8;font-weight:600;line-height:1.5;}
+.rpt-alert{background:rgba(255,193,7,.07);border-left:3px solid #ffc107;border-radius:0 8px 8px 0;
+  padding:9px 12px;margin-top:7px;font-size:.77rem;color:#ffe082;font-weight:600;line-height:1.5;}
+.rtag{display:inline-block;background:rgba(176,107,255,.1);border:1px solid rgba(176,107,255,.22);
+  border-radius:50px;padding:2px 9px;font-size:.7rem;font-weight:700;color:#c4a0ff;margin:2px 2px 2px 0;}
+
+/* MODALS */
+.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);
+  z-index:100;align-items:center;justify-content:center;padding:14px;}
+.mo.open{display:flex;}
+.mb{background:var(--card);border:1px solid var(--border);border-radius:24px;width:100%;max-width:400px;
+  padding:22px 18px;animation:popUp .26s cubic-bezier(.175,.885,.32,1.275);max-height:92vh;overflow-y:auto;}
+.mb::-webkit-scrollbar{width:3px;}
+.mb::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);}
+@keyframes popUp{from{transform:scale(.78);opacity:0;}to{transform:scale(1);opacity:1;}}
+.mhdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.mtitle{font-family:'Baloo 2',cursive;font-size:1.15rem;font-weight:900;}
+.mclose{background:rgba(255,255,255,.07);border:none;color:var(--txt);
+  width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1rem;
+  display:flex;align-items:center;justify-content:center;}
+.score-row{display:flex;justify-content:space-between;margin-bottom:12px;}
+.spill{background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:50px;
+  padding:5px 12px;font-family:'Baloo 2',cursive;font-weight:800;font-size:.82rem;}
+.fb{border-radius:11px;padding:10px 14px;margin-top:11px;text-align:center;
+  font-family:'Baloo 2',cursive;font-size:.92rem;font-weight:800;display:none;}
+.fb.show{display:block;}
+.fb.ok{background:rgba(67,233,123,.18);color:var(--p3);}
+.fb.fail{background:rgba(255,101,132,.18);color:var(--p2);}
+.mq-box{background:rgba(108,99,255,.1);border:2px solid rgba(108,99,255,.28);border-radius:14px;padding:22px;text-align:center;margin-bottom:16px;}
+.mq-txt{font-family:'Baloo 2',cursive;font-size:2.3rem;font-weight:900;}
+.mopts{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.mopt{background:rgba(255,255,255,.05);border:1.5px solid var(--border);border-radius:11px;
+  padding:13px;font-family:'Baloo 2',cursive;font-size:1.1rem;font-weight:800;cursor:pointer;transition:all .14s;color:var(--txt);}
+.mopt:hover{border-color:var(--p1);}
+.mopt.ok{background:rgba(67,233,123,.18);border-color:var(--p3);color:var(--p3);}
+.mopt.fail{background:rgba(255,101,132,.18);border-color:var(--p2);color:var(--p2);}
+.mgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;}
+.mmc{aspect-ratio:1;background:linear-gradient(135deg,var(--p1),#a78bfa);border-radius:9px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:1.5rem;border:2px solid transparent;user-select:none;}
+.mmc.flip,.mmc.match{background:var(--card2);border-color:var(--p1);}
+.mmc.match{border-color:var(--p3);opacity:.65;pointer-events:none;}
+.mmc .mf{display:none;}.mmc .mb2{font-size:1.1rem;}
+.mmc.flip .mf,.mmc.match .mf{display:block;}
+.mmc.flip .mb2,.mmc.match .mb2{display:none;}
+.wbox{background:rgba(255,101,132,.07);border:2px solid rgba(255,101,132,.22);border-radius:13px;padding:14px;margin-bottom:12px;text-align:center;}
+.w-hint{color:var(--muted);font-size:.77rem;font-weight:700;margin-bottom:7px;}
+.w-blanks{display:flex;gap:5px;justify-content:center;flex-wrap:wrap;}
+.wl{width:33px;height:33px;border-radius:7px;border-bottom:3px solid var(--p2);
+  display:flex;align-items:center;justify-content:center;font-family:'Baloo 2',cursive;font-size:1.1rem;font-weight:900;}
+.wl.filled{background:rgba(255,101,132,.12);border:2px solid var(--p2);}
+.wdel{background:rgba(255,101,132,.14);border:2px solid rgba(255,101,132,.35);border-radius:11px;
+  padding:7px 16px;cursor:pointer;color:var(--p2);font-family:'Baloo 2',cursive;font-weight:800;font-size:.86rem;}
+.letts{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:11px;}
+.lbtn{width:39px;height:39px;border-radius:9px;background:rgba(255,255,255,.06);border:1.5px solid var(--border);
+  color:var(--txt);font-family:'Baloo 2',cursive;font-weight:800;font-size:1rem;cursor:pointer;transition:all .14s;}
+.lbtn:hover{background:rgba(255,101,132,.18);border-color:var(--p2);}
+.lbtn.used{opacity:.2;pointer-events:none;}
+.lbox{background:rgba(67,233,123,.05);border:2px solid rgba(67,233,123,.18);border-radius:13px;padding:16px;margin-bottom:13px;}
+.lq{font-weight:800;font-size:.9rem;line-height:1.55;color:#fff;}
+.lopts{display:flex;flex-direction:column;gap:7px;margin-top:11px;}
+.lopt{background:rgba(255,255,255,.04);border:1.5px solid var(--border);border-radius:10px;
+  padding:11px 13px;cursor:pointer;font-weight:700;font-size:.86rem;text-align:left;color:var(--txt);transition:all .14s;}
+.lopt:hover{border-color:var(--p3);}
+.lopt.ok{background:rgba(67,233,123,.18);border-color:var(--p3);color:var(--p3);}
+.lopt.fail{background:rgba(255,101,132,.18);border-color:var(--p2);color:var(--p2);}
+.lvl-chip{display:inline-flex;align-items:center;gap:4px;background:rgba(108,99,255,.2);border:1px solid rgba(108,99,255,.4);border-radius:50px;padding:3px 11px;font-family:'Baloo 2',cursive;font-weight:800;font-size:.76rem;color:#a78bfa;}
+.xpbar-w{background:rgba(255,255,255,.06);border-radius:50px;height:7px;overflow:hidden;}
+.xpbar{height:100%;background:linear-gradient(90deg,var(--p1),#a78bfa);border-radius:50px;transition:width .5s;}
+/* FEELINGS */
+.lua-av{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--lua),var(--lua2));
+  display:flex;align-items:center;justify-content:center;font-size:1.7rem;margin:0 auto 8px;
+  box-shadow:0 0 22px rgba(176,107,255,.45);animation:luapulse 2.5s ease-in-out infinite;}
+@keyframes luapulse{0%,100%{box-shadow:0 0 22px rgba(176,107,255,.45);}50%{box-shadow:0 0 40px rgba(176,107,255,.75);}}
+.lua-bub{background:linear-gradient(135deg,#130825,#1e1040);border:1.5px solid rgba(176,107,255,.3);
+  border-radius:18px 18px 18px 4px;padding:14px 16px;margin-bottom:12px;}
+.lua-nm{font-family:'Baloo 2',cursive;font-size:.7rem;font-weight:800;color:var(--lua);margin-bottom:4px;}
+.lua-txt{font-size:.88rem;font-weight:700;color:#e8d5ff;line-height:1.6;}
+.feel-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.felbtn{background:rgba(255,255,255,.04);border:2px solid rgba(255,255,255,.09);border-radius:14px;
+  padding:13px 10px;cursor:pointer;transition:all .17s;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--txt);}
+.felbtn:hover{transform:translateY(-2px);}
+.felbtn .fe{font-size:1.9rem;}.felbtn .fl{font-family:'Baloo 2',cursive;font-weight:800;font-size:.78rem;}
+.int-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:8px;}
+.ibtn{padding:7px 14px;border-radius:50px;border:2px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);
+  cursor:pointer;font-family:'Baloo 2',cursive;font-weight:800;font-size:.8rem;color:var(--txt);transition:all .14s;}
+.ibtn.on{background:rgba(176,107,255,.28);border-color:var(--lua);color:#d4b0ff;}
+.ctx-btn{background:rgba(255,255,255,.04);border:1.5px solid rgba(176,107,255,.18);border-radius:11px;
+  padding:11px 14px;color:var(--txt);font-family:'Nunito',sans-serif;font-weight:700;font-size:.85rem;
+  cursor:pointer;text-align:left;display:flex;align-items:center;gap:9px;transition:all .14s;margin-bottom:7px;width:100%;}
+.ctx-btn:hover{border-color:var(--lua);}
+.step-dots{display:flex;gap:5px;justify-content:center;margin-bottom:12px;}
+.dot{width:25px;height:5px;border-radius:5px;background:rgba(255,255,255,.09);transition:all .3s;}
+.dot.done{background:linear-gradient(90deg,var(--lua),var(--lua2));}
+.dot.cur{background:rgba(176,107,255,.48);width:36px;}
+.info-banner{border-radius:12px;padding:10px 13px;margin-bottom:12px;display:flex;align-items:flex-start;gap:9px;font-size:.75rem;font-weight:600;line-height:1.5;}
+.info-gold{background:rgba(255,215,0,.07);border:1.5px solid rgba(255,215,0,.18);color:#ffe082;}
+.info-lua{background:rgba(176,107,255,.07);border:1.5px solid rgba(176,107,255,.18);color:#d4b0ff;}
+.info-green{background:rgba(67,233,123,.06);border:1.5px solid rgba(67,233,123,.18);color:#a0ffc8;}
+
+/* TOAST */
+#toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(18px);
+  background:rgba(15,22,36,.96);border:1.5px solid var(--gold);border-radius:50px;
+  padding:9px 20px;font-family:'Baloo 2',cursive;font-weight:800;font-size:.88rem;
+  color:var(--gold);white-space:nowrap;opacity:0;transition:all .3s;z-index:300;pointer-events:none;}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+@keyframes sfx{0%{transform:translate(0,0) scale(1);opacity:1;}100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0;}}
+.sfx{position:fixed;pointer-events:none;z-index:400;font-size:1.1rem;animation:sfx .85s ease-out forwards;}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading">
+  <div style="font-size:3rem;margin-bottom:8px;">⚡</div>
+  <div class="spin"></div>
+  <div id="load-txt">Carregando o App do Rafael...</div>
+</div>
+
+<!-- SETUP — aparece na 1ª vez -->
+<div id="setup-screen">
+  <div class="setup-box">
+    <div style="font-size:2.5rem;text-align:center;margin-bottom:10px;">⚡</div>
+    <div class="setup-title">Bem-vindo ao App do Rafael!</div>
+    <div class="setup-sub">Para começar, cole as credenciais do Supabase abaixo.<br>Você encontra isso em <b>Project Settings → API</b> no Supabase.</div>
+    <div class="setup-label">🔗 URL do Projeto Supabase</div>
+    <input class="setup-input" id="setup-url" type="url" placeholder="https://xxxx.supabase.co" autocomplete="off">
+    <div class="setup-label">🔑 Anon Key (chave pública)</div>
+    <input class="setup-input" id="setup-key" type="text" placeholder="eyJhbGci..." autocomplete="off">
+    <button class="setup-btn" onclick="saveSetup()">🚀 Conectar e Salvar</button>
+    <div class="setup-note">Essas informações ficam salvas no seu celular/navegador.<br>Você só precisa fazer isso uma vez! 🎉</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+<div id="topbar">
+  <div class="topbar-title" id="ttitle">⚡ App do Rafael</div>
+  <div class="top-pills">
+    <div class="pill pill-gold">⭐<span id="pill-stars">0</span></div>
+    <div class="pill pill-green">💰<span id="pill-money">R$0</span><div class="sync-dot" id="sync-dot"></div></div>
+  </div>
+</div>
+
+<!-- HOME -->
+<div class="screen active" id="s-home">
+  <div class="hero-card">
+    <div style="color:var(--muted);font-size:.8rem;font-weight:600;margin-bottom:3px;">Olá, Rafael! 👋</div>
+    <div style="font-family:'Baloo 2',cursive;font-size:1.65rem;font-weight:900;line-height:1.1;background:linear-gradient(90deg,#fff,#b0c4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Você é incrível,<br>vamos crescer hoje! 🚀</div>
+    <div style="margin-top:12px;background:rgba(108,99,255,.1);border:1px solid rgba(108,99,255,.22);border-radius:11px;padding:9px 13px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+        <span style="font-family:'Baloo 2',cursive;font-weight:800;font-size:.85rem;color:#a78bfa;">⚡ Nível <span id="h-lvl">1</span></span>
+        <span style="font-size:.67rem;color:var(--muted);font-weight:700;" id="h-xp-lbl">0 XP</span>
+      </div>
+      <div class="xpbar-w"><div class="xpbar" id="h-xpbar" style="width:0%"></div></div>
+    </div>
+    <div style="display:flex;gap:9px;margin-top:10px;">
+      <div style="flex:1;background:rgba(255,255,255,.04);border-radius:9px;padding:9px 11px;">
+        <div style="font-size:.63rem;color:var(--muted);font-weight:700;margin-bottom:2px;">TAREFAS</div>
+        <div style="font-family:'Baloo 2',cursive;font-size:.95rem;font-weight:800;" id="h-tasks">0/12</div>
+        <div class="pbar-wrap" style="margin-top:4px;"><div class="pbar" id="h-tbar" style="width:0%;background:linear-gradient(90deg,#43E97B,#06b6d4);"></div></div>
+      </div>
+      <div style="flex:1;background:rgba(255,255,255,.04);border-radius:9px;padding:9px 11px;">
+        <div style="font-size:.63rem;color:var(--muted);font-weight:700;margin-bottom:2px;">CORAGEM</div>
+        <div style="font-family:'Baloo 2',cursive;font-size:.95rem;font-weight:800;" id="h-courage">0/12</div>
+        <div class="pbar-wrap" style="margin-top:4px;"><div class="pbar" id="h-cbar" style="width:0%;background:linear-gradient(90deg,#b06bff,#ff6bce);"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="sec-title">🎮 Jogos Educativos</div>
+  <div class="ggrid">
+    <div class="gc m1" onclick="openGame('math')"><span class="gc-icon">➕</span><div class="gc-name">Matemática Rápida</div><div class="gc-desc">Contas e raciocínio!</div><div class="gc-badge">⭐ Até 15</div></div>
+    <div class="gc m2" onclick="openGame('words')"><span class="gc-icon">🔤</span><div class="gc-name">Palavras Mágicas</div><div class="gc-desc">Monte palavras!</div><div class="gc-badge">⭐ Até 12</div></div>
+    <div class="gc m3" onclick="openGame('logic')"><span class="gc-icon">🧩</span><div class="gc-name">Desafio de Lógica</div><div class="gc-desc">Puzzles cerebrais!</div><div class="gc-badge">⭐ Até 15</div></div>
+    <div class="gc m4" onclick="openGame('memory')"><span class="gc-icon">🃏</span><div class="gc-name">Jogo da Memória</div><div class="gc-desc">Encontre os pares!</div><div class="gc-badge">⭐ Até 10</div></div>
+    <div class="gc m5" onclick="openGame('science')"><span class="gc-icon">🔬</span><div class="gc-name">Quiz Ciências</div><div class="gc-desc">Natureza e mundo!</div><div class="gc-badge">⭐ Até 12</div></div>
+    <div class="gc m6" onclick="openGame('quiz')"><span class="gc-icon">🌍</span><div class="gc-name">Quiz Geral</div><div class="gc-desc">Perguntas de tudo!</div><div class="gc-badge">⭐ Até 10</div></div>
+    <div class="gc mfeel" onclick="openGame('feelings')">
+      <div style="display:flex;align-items:center;gap:13px;">
+        <span style="font-size:2.5rem;">🌙</span>
+        <div><div class="gc-name" style="font-size:.98rem;color:#d4b0ff;">Como você está, Rafael? 💜</div>
+          <div class="gc-desc" style="font-size:.71rem;">Converse com a Lua, sua amiga psicóloga!</div>
+          <div class="gc-badge" style="margin-top:6px;">⭐ 8 estrelas + relatório para a mamãe</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TASKS -->
+<div class="screen" id="s-tasks">
+  <div class="info-banner info-gold"><span style="font-size:1.3rem;flex-shrink:0;">💰</span><div><b>Tudo gera estrelas que viram R$!</b> Tarefas domésticas, desafios de coragem e sessões com a Lua contam para a sua mesada.</div></div>
+  <div class="sec-title" style="margin-top:2px;">🏠 Tarefas da Casa</div>
+  <div class="filter-row">
+    <button class="fbtn on" onclick="filterT('all',this)" data-c="all">Todas</button>
+    <button class="fbtn" onclick="filterT('facil',this)" data-c="facil">🟢 Fácil</button>
+    <button class="fbtn" onclick="filterT('medio',this)" data-c="medio">🟡 Médio</button>
+    <button class="fbtn" onclick="filterT('dificil',this)" data-c="dificil">🔴 Difícil</button>
+  </div>
+  <div id="task-list"></div>
+  <div class="sec-title">🦁 Desafios de Coragem</div>
+  <div class="info-banner info-lua"><span style="font-size:1.3rem;flex-shrink:0;">🌙</span><div>Esses desafios foram feitos especialmente para você! Sem pressa, sem pressão. Cada passo já é uma vitória enorme. 💜</div></div>
+  <div id="courage-list"></div>
+</div>
+
+<!-- MESADA -->
+<div class="screen" id="s-rewards">
+  <div class="rw-hero">
+    <div style="font-size:2.5rem;margin-bottom:6px;">⭐</div>
+    <div class="rw-num" id="rw-num">0</div>
+    <div style="color:var(--muted);font-size:.78rem;font-weight:600;margin-top:3px;">estrelas ganhas este mês</div>
+    <div class="money-box">
+      <span style="font-size:.8rem;color:var(--muted);font-weight:700;">💰 Mesada acumulada:</span>
+      <span class="money-val" id="rw-money">R$ 0,00</span>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <span style="font-family:'Baloo 2',cursive;font-weight:800;font-size:.9rem;">Progresso do mês</span>
+      <span style="font-size:.76rem;color:var(--muted);font-weight:700;" id="rw-pct">0%</span>
+    </div>
+    <div class="month-prog"><div class="month-fill" id="rw-bar" style="width:0%"></div></div>
+    <div style="display:flex;justify-content:space-between;margin-top:5px;">
+      <span style="font-size:.68rem;color:var(--muted);font-weight:700;">0 ⭐</span>
+      <span style="font-size:.68rem;color:var(--muted);font-weight:700;" id="rw-goal">Meta: 100 ⭐</span>
+    </div>
+  </div>
+
+  <!-- RATEIO DETALHADO -->
+  <div class="rateio-card">
+    <h3>📊 Rateio da Mesada — Como é calculado</h3>
+    <div id="rateio-rows"></div>
+    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-weight:800;font-size:.9rem;">Total acumulado</span>
+      <span style="font-family:'Baloo 2',cursive;font-weight:900;font-size:1.2rem;color:#43E97B;" id="rateio-total">R$ 0,00</span>
+    </div>
+  </div>
+
+  <!-- CONFIGURAÇÃO DA MAMÃE -->
+  <div class="cfg-card">
+    <h3>⚙️ Configurar Recompensas (Mamãe)</h3>
+    <div class="cfg-row">
+      <span class="cfg-name">💰 Valor da mesada mensal (R$)</span>
+      <input class="cfg-input" type="number" id="cfg-r" value="100" min="0" step="10" onchange="saveCfg()">
+    </div>
+    <div class="cfg-row">
+      <span class="cfg-name">⭐ Meta de estrelas para 100% da mesada</span>
+      <input class="cfg-input" type="number" id="cfg-s" value="100" min="1" onchange="saveCfg()">
+    </div>
+    <div class="cfg-row">
+      <span class="cfg-name">🏠 Multiplicador de tarefas domésticas</span>
+      <input class="cfg-input" type="number" id="cfg-t" value="1" min="0.5" step="0.5" onchange="saveCfg()">
+    </div>
+    <div class="cfg-row">
+      <span class="cfg-name">🦁 Multiplicador de desafios de coragem</span>
+      <input class="cfg-input" type="number" id="cfg-c" value="1.5" min="0.5" step="0.5" onchange="saveCfg()">
+    </div>
+    <div style="margin-top:10px;padding:10px;background:rgba(255,215,0,.05);border-radius:10px;font-size:.73rem;color:#ffe082;line-height:1.5;">
+      💡 <b>Como funciona o rateio:</b> Cada estrela vale R$ (valor da mesada ÷ meta de estrelas). Multiplique por categoria para incentivar o que é mais importante. Desafios de coragem com multiplicador 1.5x valem 50% a mais!
+    </div>
+  </div>
+
+  <!-- HISTÓRICO -->
+  <div class="cfg-card">
+    <h3>📋 Histórico de Atividades</h3>
+    <div id="hist-list"><div style="color:var(--muted);font-size:.82rem;text-align:center;padding:10px;">Nenhuma atividade ainda 😊</div></div>
+  </div>
+</div>
+
+<!-- PROFILE -->
+<div class="screen" id="s-profile">
+  <div class="prof-hero">
+    <div class="avatar">🦸</div>
+    <div class="prof-name">Rafael</div>
+    <div class="prof-lvl" id="p-lvl">Nível 1 • Aprendiz</div>
+    <div style="margin-top:11px;width:100%;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+        <span style="font-size:.68rem;color:var(--muted);font-weight:700;" id="p-xp-lbl">XP: 0</span>
+        <span style="font-size:.68rem;color:#a78bfa;font-weight:800;">⚡ EXP</span>
+      </div>
+      <div class="xpbar-w" style="height:9px;"><div class="xpbar" id="p-xpbar" style="width:0%"></div></div>
+    </div>
+  </div>
+  <div class="stats-g">
+    <div class="stat-b"><div class="stat-v" id="ps-stars">0</div><div class="stat-l">ESTRELAS</div></div>
+    <div class="stat-b"><div class="stat-v" id="ps-games">0</div><div class="stat-l">JOGOS</div></div>
+    <div class="stat-b"><div class="stat-v" id="ps-courage">0</div><div class="stat-l">CORAGENS</div></div>
+  </div>
+  <div class="sec-title">🏆 Conquistas</div>
+  <div id="ach-list"></div>
+</div>
+
+<!-- MAMA -->
+<div class="screen" id="s-mama">
+  <div id="mama-lock-view">
+    <div class="mama-lock">
+      <div style="font-size:3rem;margin-bottom:10px;">👩‍💻</div>
+      <div style="font-family:'Baloo 2',cursive;font-size:1.2rem;font-weight:900;color:#d4b0ff;margin-bottom:5px;">Área da Mamãe 💜</div>
+      <div style="color:var(--muted);font-size:.78rem;font-weight:600;line-height:1.5;margin-bottom:4px;">Relatório emocional, desafios e mesada do Rafael.</div>
+      <div class="pin-row">
+        <input class="pin-in" type="password" maxlength="1" id="p0" oninput="pnext(0)" inputmode="numeric">
+        <input class="pin-in" type="password" maxlength="1" id="p1" oninput="pnext(1)" inputmode="numeric">
+        <input class="pin-in" type="password" maxlength="1" id="p2" oninput="pnext(2)" inputmode="numeric">
+        <input class="pin-in" type="password" maxlength="1" id="p3" oninput="pnext(3)" inputmode="numeric">
+      </div>
+      <div style="font-size:.7rem;color:var(--muted);margin-bottom:12px;">PIN padrão: <b style="color:var(--lua)">1234</b></div>
+      <button class="unlock-btn" onclick="checkPin()">🔓 Entrar</button>
+      <div id="pin-err" style="color:var(--p2);font-size:.76rem;margin-top:8px;display:none;">PIN incorreto.</div>
+    </div>
+  </div>
+  <div id="mama-panel-view" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div>
+        <div style="font-family:'Baloo 2',cursive;font-weight:900;font-size:1.1rem;color:#d4b0ff;">Relatório do Rafael 💜</div>
+        <div style="font-size:.7rem;color:var(--muted);font-weight:600;">Mapeamento emocional e de coragem</div>
+      </div>
+      <button onclick="mamaLock()" style="background:rgba(255,101,132,.14);border:1.5px solid rgba(255,101,132,.3);border-radius:50px;padding:6px 12px;color:var(--p2);font-family:'Baloo 2',cursive;font-weight:800;font-size:.76rem;cursor:pointer;">🔒 Sair</button>
+    </div>
+    <div id="mama-content"></div>
+  </div>
+</div>
+
+<nav id="nav">
+  <button class="nb on" onclick="goS('home',this)"><span class="ni">🏠</span>Início</button>
+  <button class="nb" onclick="goS('tasks',this)"><span class="ni">✅</span>Tarefas</button>
+  <button class="nb" onclick="goS('rewards',this)"><span class="ni">⭐</span>Mesada</button>
+  <button class="nb" onclick="goS('profile',this)"><span class="ni">🦸</span>Perfil</button>
+  <button class="nb" onclick="goS('mama',this)"><span class="ni">👩‍💻</span>Mamãe</button>
+</nav>
+</div>
+
+<!-- MODALS -->
+<div class="mo" id="mo-math"><div class="mb"><div class="mhdr"><span class="mtitle">➕ Matemática Rápida</span><button class="mclose" onclick="closeM('math')">✕</button></div><div class="score-row"><div class="spill">🎯 <span id="mt-score">0</span>pts</div><div class="spill">❓ <span id="mt-q">1</span>/5</div></div><div class="mq-box"><div class="mq-txt" id="mt-qtext"></div></div><div class="mopts" id="mt-opts"></div><div class="fb" id="mt-fb"></div></div></div>
+<div class="mo" id="mo-memory"><div class="mb"><div class="mhdr"><span class="mtitle">🃏 Jogo da Memória</span><button class="mclose" onclick="closeM('memory')">✕</button></div><div class="score-row"><div class="spill">✅ Pares: <span id="mm-p">0</span>/8</div><div class="spill">🔄 <span id="mm-t">0</span></div></div><div class="mgrid" id="mm-grid"></div><div class="fb" id="mm-fb"></div></div></div>
+<div class="mo" id="mo-words"><div class="mb"><div class="mhdr"><span class="mtitle">🔤 Palavras Mágicas</span><button class="mclose" onclick="closeM('words')">✕</button></div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;"><div class="lvl-chip">⚡ Nível <span id="wd-lvl">1</span></div><div class="xpbar-w" style="width:110px;"><div class="xpbar" id="wd-xpb" style="width:0%"></div></div></div><div class="score-row"><div class="spill">🎯 <span id="wd-score">0</span>pts</div><div class="spill">❓ <span id="wd-q">1</span>/4</div></div><div class="wbox"><div class="w-hint" id="wd-hint"></div><div class="w-blanks" id="wd-blanks"></div><div style="margin-top:8px;"><button class="wdel" onclick="delLetter()">⌫ Apagar</button></div></div><div class="letts" id="wd-letts"></div><div class="fb" id="wd-fb"></div></div></div>
+<div class="mo" id="mo-logic"><div class="mb"><div class="mhdr"><span class="mtitle">🧩 Desafio de Lógica</span><button class="mclose" onclick="closeM('logic')">✕</button></div><div class="score-row"><div class="spill">🎯 <span id="lg-score">0</span>pts</div><div class="spill">❓ <span id="lg-q">1</span>/4</div></div><div class="lbox"><div class="lq" id="lg-qtext"></div></div><div class="lopts" id="lg-opts"></div><div class="fb" id="lg-fb"></div></div></div>
+<div class="mo" id="mo-science"><div class="mb"><div class="mhdr"><span class="mtitle">🔬 Quiz de Ciências</span><button class="mclose" onclick="closeM('science')">✕</button></div><div class="score-row"><div class="spill">🎯 <span id="sc-score">0</span>pts</div><div class="spill">❓ <span id="sc-q">1</span>/4</div></div><div class="lbox" style="background:rgba(79,195,247,.05);border-color:rgba(79,195,247,.18);"><div class="lq" id="sc-qtext"></div></div><div class="lopts" id="sc-opts"></div><div class="fb" id="sc-fb"></div></div></div>
+<div class="mo" id="mo-quiz"><div class="mb"><div class="mhdr"><span class="mtitle">🌍 Quiz Geral</span><button class="mclose" onclick="closeM('quiz')">✕</button></div><div class="score-row"><div class="spill">🎯 <span id="qz-score">0</span>pts</div><div class="spill">❓ <span id="qz-q">1</span>/4</div></div><div class="lbox" style="background:rgba(236,72,153,.05);border-color:rgba(236,72,153,.18);"><div class="lq" id="qz-qtext"></div></div><div class="lopts" id="qz-opts"></div><div class="fb" id="qz-fb"></div></div></div>
+<div class="mo" id="mo-feelings"><div class="mb" style="background:linear-gradient(135deg,#080514,#110826);"><div class="mhdr"><span class="mtitle" style="color:#d4b0ff;">💜 Como você está?</span><button class="mclose" onclick="closeM('feelings')">✕</button></div><div class="step-dots" id="feel-dots"></div><div id="feel-content"></div></div></div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  SUPABASE CONFIG
+// ══════════════════════════════════════════════════════
+let SB = null;
+
+function initSupabase(url, key) {
+  SB = supabase.createClient(url, key);
+}
+
+async function saveSetup() {
+  const url = document.getElementById('setup-url').value.trim();
+  const key = document.getElementById('setup-key').value.trim();
+  if (!url || !key) { alert('Preencha os dois campos!'); return; }
+  localStorage.setItem('sb_url', url);
+  localStorage.setItem('sb_key', key);
+  initSupabase(url, key);
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('loading').style.display = 'flex';
+  await loadAllData();
+}
+
+// ══════════════════════════════════════════════════════
+//  LOCAL STATE (fallback + cache)
+// ══════════════════════════════════════════════════════
+const S = {
+  totalXP: 0, totalStars: 0, moneyStars: 0,
+  gamesEver: 0, tasksEver: 0, couragesEver: 0,
+  cfg: { money: 100, goal: 100, taskMult: 1.0, courageMult: 1.5 },
+  history: [], feelLog: [], courageLog: [],
+  tasksDone: {}, courageDone: {},
+  achDone: {},
+  // Rateio por categoria
+  rateio: { tasks:0, courage:0, feelings:0, games:0 }
+};
+
+// ══════════════════════════════════════════════════════
+//  LOAD ALL DATA FROM SUPABASE
+// ══════════════════════════════════════════════════════
+async function loadAllData() {
+  setSyncStatus(true);
+  try {
+    // State
+    const { data: st } = await SB.from('rafael_state').select('*').eq('id','rafael').single();
+    if (st) {
+      S.totalXP      = st.total_xp || 0;
+      S.totalStars   = st.total_stars || 0;
+      S.moneyStars   = st.money_stars || 0;
+      S.gamesEver    = st.games_ever || 0;
+      S.tasksEver    = st.tasks_ever || 0;
+      S.couragesEver = st.courages_ever || 0;
+      S.cfg.money      = parseFloat(st.cfg_money) || 100;
+      S.cfg.goal       = st.cfg_goal || 100;
+      S.cfg.taskMult   = parseFloat(st.cfg_task_mult) || 1.0;
+      S.cfg.courageMult = parseFloat(st.cfg_courage_mult) || 1.5;
+    }
+
+    // Tasks done
+    const curMonth = getCurrentMonth();
+    const { data: td } = await SB.from('rafael_tasks').select('*').eq('month_year', curMonth);
+    S.tasksDone = {};
+    (td || []).forEach(t => { if (t.done) S.tasksDone[t.task_id] = true; });
+
+    // Courage done
+    const { data: cd } = await SB.from('rafael_courage').select('*');
+    S.courageDone = {};
+    (cd || []).forEach(c => { if (c.done) S.courageDone[c.challenge_id] = true; });
+
+    // History (last 20)
+    const { data: hist } = await SB.from('rafael_history').select('*').order('created_at', { ascending: false }).limit(20);
+    S.history = (hist || []).map(h => ({
+      ico: h.icon, name: h.name, stars: h.stars, isMoney: h.is_money,
+      t: new Date(h.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    }));
+
+    // Feel sessions
+    const { data: fl } = await SB.from('rafael_feel_sessions').select('*').order('created_at', { ascending: false }).limit(30);
+    S.feelLog = (fl || []).map(f => ({
+      date: new Date(f.created_at).toLocaleDateString('pt-BR'),
+      time: new Date(f.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      feeling: f.feeling, feelingLabel: f.feeling_label, emoji: f.emoji,
+      intensity: f.intensity, context: f.context, advice: f.advice,
+      needsAttn: f.needs_attention
+    }));
+
+    // Courage log
+    const { data: cl } = await SB.from('rafael_courage_log').select('*').order('created_at', { ascending: false }).limit(20);
+    S.courageLog = (cl || []).map(c => ({
+      date: new Date(c.created_at).toLocaleDateString('pt-BR'),
+      name: c.challenge_name, cat: c.category, stars: c.stars, mama: c.mama_message
+    }));
+
+    // Achievements
+    const { data: ach } = await SB.from('rafael_achievements').select('*');
+    S.achDone = {};
+    (ach || []).forEach(a => { if (a.unlocked) S.achDone[a.achievement_id] = true; });
+
+    // Rateio do mês atual
+    await calcRateio();
+
+    setSyncStatus(true);
+  } catch(e) {
+    console.error('Erro ao carregar:', e);
+    setSyncStatus(false);
+  }
+
+  document.getElementById('loading').style.display = 'none';
+  updateAllUI();
+}
+
+function getCurrentMonth() {
+  const now = new Date();
+  return `${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
+}
+
+// ══════════════════════════════════════════════════════
+//  SYNC STATUS
+// ══════════════════════════════════════════════════════
+function setSyncStatus(ok) {
+  const d = document.getElementById('sync-dot');
+  if (d) { d.classList.toggle('err', !ok); }
+}
+
+// ══════════════════════════════════════════════════════
+//  SAVE STATE TO SUPABASE
+// ══════════════════════════════════════════════════════
+async function saveState() {
+  if (!SB) return;
+  try {
+    await SB.from('rafael_state').upsert({
+      id: 'rafael',
+      total_xp: S.totalXP, total_stars: S.totalStars, money_stars: S.moneyStars,
+      games_ever: S.gamesEver, tasks_ever: S.tasksEver, courages_ever: S.couragesEver,
+      cfg_money: S.cfg.money, cfg_goal: S.cfg.goal,
+      cfg_task_mult: S.cfg.taskMult, cfg_courage_mult: S.cfg.courageMult,
+      updated_at: new Date().toISOString()
+    });
+    setSyncStatus(true);
+  } catch(e) { setSyncStatus(false); }
+}
+
+// ══════════════════════════════════════════════════════
+//  RATEIO — cálculo detalhado por categoria
+// ══════════════════════════════════════════════════════
+async function calcRateio() {
+  if (!SB) return;
+  const curMonth = getCurrentMonth();
+  const valorPorEstrela = S.cfg.money / Math.max(S.cfg.goal, 1);
+
+  // Contar estrelas por categoria neste mês
+  const { data: hist } = await SB.from('rafael_history')
+    .select('icon, stars, created_at')
+    .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
+
+  let rTasks = 0, rCourage = 0, rFeelings = 0, rGames = 0;
+  (hist || []).forEach(h => {
+    if (h.icon === '✅') rTasks += h.stars;
+    else if (h.icon === '🦁') rCourage += h.stars;
+    else if (h.icon === '💜') rFeelings += h.stars;
+    else if (h.icon === '🎮') rGames += h.stars;
+  });
+
+  S.rateio = {
+    tasks:    { stars: rTasks,    money: rTasks * valorPorEstrela * S.cfg.taskMult },
+    courage:  { stars: rCourage,  money: rCourage * valorPorEstrela * S.cfg.courageMult },
+    feelings: { stars: rFeelings, money: rFeelings * valorPorEstrela },
+    games:    { stars: rGames,    money: rGames * valorPorEstrela },
+  };
+}
+
+// ══════════════════════════════════════════════════════
+//  EARN STARS — salva no Supabase
+// ══════════════════════════════════════════════════════
+async function earnStars(n, icon, name, isMoney) {
+  S.totalStars += n;
+  if (isMoney) S.moneyStars += n;
+  updateTopPills();
+  toast(`${icon} +${n} ⭐`);
+  spawnFX();
+
+  if (SB) {
+    try {
+      await SB.from('rafael_history').insert({ icon, name, stars: n, is_money: isMoney });
+      setSyncStatus(true);
+    } catch(e) { setSyncStatus(false); }
+  }
+  S.history.unshift({ ico: icon, name, stars: n, isMoney, t: new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) });
+  if (S.history.length > 20) S.history.pop();
+
+  await saveState();
+  await calcRateio();
+  renderRewards();
+}
+
+function updateTopPills() {
+  document.getElementById('pill-stars').textContent = S.totalStars;
+  const v = (S.moneyStars / S.cfg.goal * S.cfg.money).toFixed(0);
+  document.getElementById('pill-money').textContent = 'R$' + v;
+}
+
+// ══════════════════════════════════════════════════════
+//  CFG SAVE
+// ══════════════════════════════════════════════════════
+async function saveCfg() {
+  S.cfg.money      = parseFloat(document.getElementById('cfg-r').value) || 100;
+  S.cfg.goal       = parseInt(document.getElementById('cfg-s').value) || 100;
+  S.cfg.taskMult   = parseFloat(document.getElementById('cfg-t').value) || 1;
+  S.cfg.courageMult = parseFloat(document.getElementById('cfg-c').value) || 1.5;
+  await saveState();
+  await calcRateio();
+  renderRewards();
+  updateTopPills();
+}
+
+// ══════════════════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════════════════
+const TITLES = { home:'⚡ App do Rafael', tasks:'✅ Tarefas e Desafios', rewards:'⭐ Minha Mesada', profile:'🦸 Meu Perfil', mama:'👩‍💻 Área da Mamãe' };
+function goS(name, btn) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nb').forEach(b => b.classList.remove('on'));
+  document.getElementById('s-'+name).classList.add('active');
+  btn.classList.add('on');
+  document.getElementById('ttitle').textContent = TITLES[name];
+  if (name==='tasks') { renderTasks(); renderCourage(); }
+  if (name==='rewards') renderRewards();
+  if (name==='profile') { renderProfile(); renderAch(); }
+  if (name==='mama' && mamaUnlocked) renderMamaContent();
+}
+
+// ══════════════════════════════════════════════════════
+//  UPDATE ALL UI
+// ══════════════════════════════════════════════════════
+function updateAllUI() {
+  updateTopPills();
+  updateHome();
+  renderTasks();
+  renderCourage();
+  renderProfile();
+  renderAch();
+  renderRewards();
+  // Preencher inputs de config
+  document.getElementById('cfg-r').value = S.cfg.money;
+  document.getElementById('cfg-s').value = S.cfg.goal;
+  document.getElementById('cfg-t').value = S.cfg.taskMult;
+  document.getElementById('cfg-c').value = S.cfg.courageMult;
+}
+
+// ══════════════════════════════════════════════════════
+//  LEVELS
+// ══════════════════════════════════════════════════════
+const LVL_XP    = [0,80,180,320,500,720,990,1310,1690,2100];
+const LVL_NAMES = ['Aprendiz','Explorador','Aventureiro','Herói','Guardião','Mestre','Campeão','Lenda','Superestrela','Deus do Jogo'];
+function getLevel(xp) { let l=1; for(let i=1;i<LVL_XP.length;i++){if(xp>=LVL_XP[i])l=i+1;else break;} return Math.min(l,10); }
+function getLvlPct(xp) { const l=getLevel(xp); if(l>=10)return 100; const c=LVL_XP[l-1],n=LVL_XP[l]; return Math.round((xp-c)/(n-c)*100); }
+function getDiff(l) { return l<=2?'easy':l<=5?'medium':'hard'; }
+
+// ══════════════════════════════════════════════════════
+//  HOME
+// ══════════════════════════════════════════════════════
+function updateHome() {
+  const td = TASKS.filter(t => S.tasksDone[t.id]).length;
+  const cd = COURAGE.filter(c => S.courageDone[c.id]).length;
+  document.getElementById('h-tasks').textContent   = td + '/' + TASKS.length;
+  document.getElementById('h-courage').textContent = cd + '/' + COURAGE.length;
+  document.getElementById('h-tbar').style.width    = (td/TASKS.length*100)+'%';
+  document.getElementById('h-cbar').style.width    = (cd/COURAGE.length*100)+'%';
+  const l = getLevel(S.totalXP);
+  document.getElementById('h-lvl').textContent  = l;
+  document.getElementById('h-xpbar').style.width = getLvlPct(S.totalXP)+'%';
+  const nxt = LVL_XP[Math.min(l,9)];
+  document.getElementById('h-xp-lbl').textContent = `${S.totalXP} XP — falta ${Math.max(0,nxt-S.totalXP)} p/ nível ${l+1}`;
+}
+
+// ══════════════════════════════════════════════════════
+//  TASKS DATA
+// ══════════════════════════════════════════════════════
+const TASKS = [
+  {id:1, e:'🛏️',name:'Arrumar a cama',            desc:'Deixar a cama arrumada e bonita!',            stars:3,  cat:'facil'},
+  {id:2, e:'🦷',name:'Escovar os dentes',           desc:'3 vezes ao dia, caprichando bem!',            stars:2,  cat:'facil'},
+  {id:3, e:'📚',name:'Guardar o material escolar',  desc:'Mochila organizada e pronta!',                stars:4,  cat:'facil'},
+  {id:4, e:'🍽️',name:'Ajudar a pôr a mesa',        desc:'Pratos e talheres com cuidado!',              stars:5,  cat:'medio'},
+  {id:5, e:'🧹',name:'Varrer o quarto',             desc:'Deixar o chão limpinho!',                     stars:6,  cat:'medio'},
+  {id:6, e:'🌿',name:'Regar as plantas',            desc:'Com carinho e medida certa!',                 stars:4,  cat:'facil'},
+  {id:7, e:'🚮',name:'Colocar o lixo fora',         desc:'Levar o saco de lixo pro lugar certo!',       stars:6,  cat:'medio'},
+  {id:8, e:'👕',name:'Dobrar as roupas',            desc:'Dobrar e guardar no armário!',                stars:8,  cat:'dificil'},
+  {id:9, e:'🍳',name:'Ajudar a preparar o lanche',  desc:'Junto com um adulto!',                        stars:7,  cat:'dificil'},
+  {id:10,e:'🧺',name:'Separar as roupas sujas',     desc:'Cores separadas das brancas!',                stars:5,  cat:'medio'},
+  {id:11,e:'🧽',name:'Lavar o prato que usou',      desc:'Deixar o prato bem limpo!',                   stars:4,  cat:'facil'},
+  {id:12,e:'🪣',name:'Limpar o banheiro c/ mamãe',  desc:'Juntos tudo fica mais fácil!',                stars:8,  cat:'dificil'},
+];
+
+function renderTasks(cat='all') {
+  const el = document.getElementById('task-list');
+  const list = cat==='all' ? TASKS : TASKS.filter(t=>t.cat===cat);
+  el.innerHTML = list.map(t => {
+    const done = !!S.tasksDone[t.id];
+    return `<div class="tcard${done?' done':''}" ${done?'':` onclick="completeTask(${t.id})"`}>
+      <div class="temoji">${t.e}</div>
+      <div class="tinfo"><div class="tname">${t.name}</div><div class="tdesc">${t.desc}</div></div>
+      <div class="treward"><div class="tv">${t.stars}⭐</div><div class="tl">${done?'FEITO!':'GANHE'}</div></div>
+      <div class="tchk${done?' on':''}">${done?'✓':''}</div>
+    </div>`;
+  }).join('');
+}
+function filterT(cat, btn) {
+  document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on'); renderTasks(cat);
+}
+async function completeTask(id) {
+  if (S.tasksDone[id]) return;
+  S.tasksDone[id] = true;
+  const t = TASKS.find(x=>x.id===id);
+  const earned = Math.round(t.stars * S.cfg.taskMult);
+  S.tasksEver++;
+  S.totalXP += earned * 6;
+  await earnStars(earned, '✅', t.name, true);
+  if (SB) {
+    await SB.from('rafael_tasks').upsert({ task_id: id, done: true, done_at: new Date().toISOString(), month_year: getCurrentMonth() });
+  }
+  checkAch(); updateHome();
+  renderTasks(document.querySelector('.fbtn.on')?.dataset?.c || 'all');
+}
+
+// ══════════════════════════════════════════════════════
+//  COURAGE DATA
+// ══════════════════════════════════════════════════════
+const COURAGE = [
+  {id:'b1',cat:'🚽 Banheiro',color:'#4FC3F7',e:'🚽',stars:5,name:'Banheiro — Passo 1',desc:'Sente no vaso por 2 minutinhos, mesmo sem precisar. Só para o corpo se acostumar!',lua:'Rafael, quando precisamos ir ao banheiro e seguramos muito, isso pode causar dor de barriga! Seu intestino é seu amigo — quando ele chamar, vamos ouvir! Que tal sentar só 2 minutos hoje? 🚽',tip:'💡 Leve um livro ou escuta música. Fica muito mais tranquilo!',mama:'Elogie muito a coragem! Reforce que o banheiro é um lugar seguro e normal. Evite qualquer sinal de impaciência.'},
+  {id:'b2',cat:'🚽 Banheiro',color:'#4FC3F7',e:'🚽',stars:8,name:'Banheiro — Passo 2: Ouvir o corpo',desc:'Quando sentir vontade, ir logo ao banheiro sem esperar. Sem segurar!',lua:'Você arrasou no passo 1! Agora: quando sentir aquela vontadezinha, vai logo! Quanto mais rápido você atender, mais confortável vai ser. Você é mais forte que o medo! 💪',tip:'💡 Respira fundo 3 vezes antes de entrar. Ajuda muito a relaxar!',mama:'Rafael está trabalhando a confiança no próprio corpo. Reforce: "Que orgulho, você ouviu o seu corpo!" Cada vez que ele conseguir, celebre muito.'},
+  {id:'b3',cat:'🚽 Banheiro',color:'#4FC3F7',e:'🏅',stars:12,name:'Banheiro — Campeão! 3 dias seguidos',desc:'Por 3 dias seguidos, ir ao banheiro quando sentir vontade, sem segurar.',lua:'Rafael, você é um verdadeiro campeão! Cuidar do próprio corpo é um superpoder. Você provou que consegue ouvir seus sinais! 🌟',tip:'💡 Faça um calendário e marque ✅ cada dia que você conseguiu!',mama:'🏆 CONQUISTA ENORME! Considere conversar com o pediatra sobre o histórico de retenção intestinal — pode haver causas físicas além do emocional.'},
+  {id:'u1',cat:'💅 Unhas e Cutículas',color:'#ff6bce',e:'🖐️',stars:5,name:'Unhas — Passo 1: Só olhar',desc:'Deixar a mamãe olhar sua mão por 1 minuto. Sem mexer, só observar.',lua:'Rafael, eu entendo que quando alguém se aproxima das suas mãos você sente um frio na barriga. Mas a mamãe cuida de você com todo amor! Vamos começar: deixa ela só olhar hoje? Você controla tudo! 💜',tip:'💡 Combine um sinal secreto: se quiser parar, faz um sinal e ela para imediatamente!',mama:'💜 APENAS olhe a mão, sem tocar. Elogie MUITO a coragem. Se houver desconforto, recue sem julgamento algum.'},
+  {id:'u2',cat:'💅 Unhas e Cutículas',color:'#ff6bce',e:'🤝',stars:8,name:'Unhas — Passo 2: Toque suave',desc:'Deixar a mamãe tocar suavemente o dorso da mão por alguns segundos.',lua:'Você foi incrível no passo 1! Agora: deixa a mamãe tocar sua mão com muita suavidade. Só o toque, por alguns segundinhos. Você pode parar quando quiser! 🦁',tip:'💡 Escuta sua música favorita durante. A música relaxa e distrai o medo!',mama:'💜 Toque apenas o dorso, muitíssimo suavemente. Se houver tensão, pause. Reforce o sinal combinado. Elogie cada segundo!'},
+  {id:'u3',cat:'💅 Unhas e Cutículas',color:'#ff6bce',e:'✂️',stars:12,name:'Unhas — Passo 3: Cuidando de uma unhinha',desc:'Confiar na mamãe para cuidar de uma uninha com muito cuidado.',lua:'Rafael, você chegou até aqui! Confiar em alguém que amamos é um ato de coragem enorme. A mamãe vai cuidar com todo carinho. E quando acabar você vai se sentir muito orgulhoso! 🌟',tip:'💡 Escolhe a música/vídeo favorito durante. E lembra: você pode parar a qualquer momento!',mama:'🎉 Marco enorme de confiança! Seja extremamente lenta e gentil. Explique cada movimento antes. Celebre MUITO juntos depois — isso é cura real!'},
+  {id:'i1',cat:'🐛 Mundo dos Bichos',color:'#43E97B',e:'📸',stars:4,name:'Bichos — Passo 1: Foto por 30 segundos',desc:'Olhar uma foto de um inseto pequeno (formiga, joaninha) por 30 segundos.',lua:'Sabia que as formigas constroem cidades inteiras debaixo da terra? E as joaninhas são heróis do jardim! Vamos começar: olhar uma foto por 30 segundinhos? Pela tela eles não alcançam você! 🌿',tip:'💡 Conta até 30 devagarzinho enquanto olha. 30 segundos passam rápido!',mama:'Apenas foto, nada de inseto real ainda. Elogie muito. Pergunte: "O que você achou?" Estimule curiosidade.'},
+  {id:'i2',cat:'🐛 Mundo dos Bichos',color:'#43E97B',e:'📚',stars:5,name:'Bichos — Passo 2: Curiosidades',desc:'Descobrir 2 fatos curiosos sobre um animal que te dá medo.',lua:'Quanto mais a gente conhece algo, menos medo sente! Uma aranha faz uma teia tão resistente que pararia um avião em escala maior. Incrível né? Vamos pesquisar hoje? 🔬',tip:'💡 Pesquise na internet junto com a mamãe. Quanto mais curioso, mais o medo diminui!',mama:'Incentive pesquisas juntas. Transforme em brincadeira. O conhecimento cria distância emocional saudável do medo.'},
+  {id:'i3',cat:'🐛 Mundo dos Bichos',color:'#43E97B',e:'👀',stars:8,name:'Bichos — Passo 3: Observar de longe',desc:'Ficar perto de um bichinho pequeno sem correr por 10 segundos.',lua:'Hoje observa de longe um bichinho real. Não precisa se aproximar nem tocar — só olhar por 10 segundinhos. Eles têm muito mais medo de você do que você deles! 🦋',tip:'💡 Finge que é um cientista pesquisando. Cientistas observam sem se assustar!',mama:'Fique ao lado para dar segurança. Se ele correr, não repreenda — elogie a tentativa: "Você ficou 3 segundos! Incrível!"'},
+  {id:'i4',cat:'🐛 Mundo dos Bichos',color:'#43E97B',e:'🦁',stars:12,name:'Bichos — Passo 4: O grande desafio!',desc:'Ficar perto de um bichinho por 30 segundos e dizer algo sobre ele.',lua:'Rafael, você é um herói de verdade! Cada segundo que você fica perto, o medo encolhe. Você está ganhando essa batalha! 🏆',tip:'💡 Fale em voz alta: "Essa formiga está carregando comida." Falar ajuda o cérebro a processar diferente!',mama:'🏆 Conquista enorme! Considere visitar um zoológico interativo. Se o medo ainda for intenso no cotidiano, um psicólogo infantil pode ajudar muito.'},
+  {id:'m1',cat:'🏃 Corpo em Movimento',color:'#F7971E',e:'🚶',stars:4,name:'Movimento — Passo 1: 5 minutos',desc:'Caminhar por 5 minutinhos dentro de casa ou no quintal.',lua:'Rafael, quando você se mexe, seu cérebro libera endorfina — o "hormônio da alegria"! Só 5 minutinhos hoje. Coloca uma música e vai andando! Você vai se sentir melhor, pode apostar! 💪',tip:'💡 Conta os passos! Desafio: chegar a 500 passos em 5 minutos!',mama:'Não pressione. Convide com animação: "Vou dar uma volta, quer vir?" Foco no prazer, nunca no esforço.'},
+  {id:'m2',cat:'🏃 Corpo em Movimento',color:'#F7971E',e:'⚽',stars:6,name:'Movimento — Passo 2: Brincadeira',desc:'Fazer uma brincadeira ativa com a mamãe por 10 minutos.',lua:'Brincadeiras com quem a gente ama são as melhores! Pega-pega, bola, pular, dançar... Você escolhe! E depois vai dormir muito melhor! 🌙',tip:'💡 Você escolhe a brincadeira! Quando a gente escolhe, é muito mais divertido.',mama:'Deixe-o escolher totalmente. A autonomia é chave. Objetivo: criar memória positiva com atividade física.'},
+  {id:'m3',cat:'🏃 Corpo em Movimento',color:'#F7971E',e:'📵',stars:8,name:'Movimento — Passo 3: 30 min sem telas',desc:'Ficar 30 minutos longe das telas fazendo algo ativo.',lua:'As telas são legais, mas o mundo lá fora é incrível! Hoje: 30 minutinhos sem celular. Você escolhe o que fazer! Depois me conta o que você descobriu! 🌈',tip:'💡 Combina com a mamãe o que vai fazer. Juntos é muito melhor!',mama:'Marco importante! Após os 30 minutos, pergunte: "Como você se sentiu?" Reforce a sensação boa. Aumente gradualmente.'},
+  {id:'m4',cat:'🏃 Corpo em Movimento',color:'#F7971E',e:'🏆',stars:12,name:'Movimento — Campeão do Corpo!',desc:'Por uma semana, fazer pelo menos 15 minutos de atividade física por dia.',lua:'Uma semana inteira se movendo todo dia! Isso é algo que poucos adultos conseguem! Seu coração, pulmões, músculos — tudo agradece! Você é incrível, Rafael! 🌟',tip:'💡 Experimente uma atividade nova: natação, futsal, ciclismo, dança — o que mais der vontade!',mama:'🏆 Uma semana de movimento diário é transformador! Se possível, matricule-o em atividade que ele escolheu. Autonomia na escolha aumenta o engajamento.'},
+];
+
+const COURAGE_CATS = [...new Set(COURAGE.map(c=>c.cat))];
+
+function renderCourage() {
+  const el = document.getElementById('courage-list');
+  el.innerHTML = COURAGE_CATS.map(cat => {
+    const items = COURAGE.filter(c=>c.cat===cat);
+    const doneCount = items.filter(c=>S.courageDone[c.id]).length;
+    const color = items[0]?.color||'#fff';
+    return `
+    <div style="margin-bottom:20px;">
+      <div class="ccat-hdr">
+        <span style="font-family:'Baloo 2',cursive;font-weight:800;font-size:.93rem;color:${color};">${cat}</span>
+        <span style="font-size:.68rem;color:var(--muted);font-weight:700;">${doneCount}/${items.length}</span>
+      </div>
+      <div class="pbar-wrap" style="margin-bottom:10px;"><div class="pbar" style="width:${doneCount/items.length*100}%;background:${color};"></div></div>
+      ${items.map(c => {
+        const done = !!S.courageDone[c.id];
+        return `<div class="ccard${done?' donec':''}">
+          <div style="display:flex;align-items:flex-start;gap:11px;">
+            <span style="font-size:1.8rem;flex-shrink:0;">${c.e}</span>
+            <div style="flex:1;">
+              <div style="font-weight:800;font-size:.86rem;margin-bottom:3px;">${c.name}${done?' ✅':''}</div>
+              <div style="font-size:.7rem;color:var(--muted);font-weight:600;line-height:1.4;margin-bottom:6px;">${c.desc}</div>
+              <div class="lua-quote">🌙 ${c.lua}</div>
+              <div class="tip-q">${c.tip}</div>
+              ${done ? `<span style="font-size:.78rem;color:var(--p3);font-weight:800;">🏆 Você superou! Incrível!</span>`
+                : `<button class="cbtn" style="background:linear-gradient(135deg,${c.color},${c.color}88);" onclick="completeCourage('${c.id}')">Eu consegui! +${c.stars}⭐💰</button>`}
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+async function completeCourage(id) {
+  if (S.courageDone[id]) return;
+  S.courageDone[id] = true;
+  const c = COURAGE.find(x=>x.id===id);
+  const earned = Math.round(c.stars * S.cfg.courageMult);
+  S.couragesEver++;
+  S.totalXP += earned * 10;
+  S.courageLog.unshift({ date: new Date().toLocaleDateString('pt-BR'), name: c.name, cat: c.cat, stars: earned, mama: c.mama });
+  await earnStars(earned, '🦁', c.name, true);
+  if (SB) {
+    await SB.from('rafael_courage').upsert({ challenge_id: id, done: true, done_at: new Date().toISOString() });
+    await SB.from('rafael_courage_log').insert({ challenge_id: id, challenge_name: c.name, category: c.cat, stars: earned, mama_message: c.mama });
+  }
+  checkAch(); updateHome();
+  setTimeout(() => toast(`🦁 Incrível, Rafael! Você superou! 💜`), 500);
+  renderCourage();
+}
+
+// ══════════════════════════════════════════════════════
+//  REWARDS / RATEIO
+// ══════════════════════════════════════════════════════
+function renderRewards() {
+  const goal = S.cfg.goal;
+  const pct = Math.min(100, Math.round(S.moneyStars / goal * 100));
+  const totalMoney = Object.values(S.rateio).reduce((acc, r) => acc + (r.money||0), 0);
+
+  document.getElementById('rw-num').textContent   = S.moneyStars;
+  document.getElementById('rw-money').textContent = 'R$ ' + totalMoney.toFixed(2).replace('.', ',');
+  document.getElementById('rw-pct').textContent   = pct + '%';
+  document.getElementById('rw-bar').style.width   = pct + '%';
+  document.getElementById('rw-goal').textContent  = 'Meta: ' + goal + ' ⭐';
+  document.getElementById('rateio-total').textContent = 'R$ ' + totalMoney.toFixed(2).replace('.', ',');
+
+  // Rateio detalhado
+  const cats = [
+    { key:'tasks',    ico:'🏠', name:'Tarefas Domésticas',   color:'#43E97B', mult: S.cfg.taskMult },
+    { key:'courage',  ico:'🦁', name:'Desafios de Coragem',   color:'#b06bff', mult: S.cfg.courageMult },
+    { key:'feelings', ico:'💜', name:'Sessões com a Lua',     color:'#ff6bce', mult: 1 },
+    { key:'games',    ico:'🎮', name:'Jogos Educativos',      color:'#F7971E', mult: 1 },
+  ];
+  const maxMoney = Math.max(...cats.map(c => S.rateio[c.key]?.money || 0), 1);
+  document.getElementById('rateio-rows').innerHTML = cats.map(c => {
+    const r = S.rateio[c.key] || { stars:0, money:0 };
+    const barW = Math.round((r.money||0) / maxMoney * 100);
+    return `<div class="rateio-row">
+      <div class="rateio-ico">${c.ico}</div>
+      <div class="rateio-info">
+        <div class="rateio-name">${c.name} <span style="font-size:.65rem;color:var(--muted);font-weight:600;">×${c.mult}</span></div>
+        <div class="rateio-stars">${r.stars||0} estrelas este mês</div>
+        <div class="rateio-bar-wrap"><div class="rateio-bar" style="width:${barW}%;background:${c.color};"></div></div>
+      </div>
+      <div class="rateio-val">R$ ${(r.money||0).toFixed(2).replace('.',',')}</div>
+    </div>`;
+  }).join('');
+
+  // Histórico
+  const hl = document.getElementById('hist-list');
+  if (!S.history.length) {
+    hl.innerHTML = '<div style="color:var(--muted);font-size:.8rem;text-align:center;padding:10px;">Nenhuma atividade ainda 😊</div>';
+    return;
+  }
+  hl.innerHTML = S.history.slice(0,10).map(h => `
+    <div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--border);">
+      <span style="font-size:1.1rem;">${h.ico}</span>
+      <span style="flex:1;font-size:.78rem;font-weight:700;">${h.name}</span>
+      <span style="color:var(--gold);font-weight:800;font-size:.8rem;">+${h.stars}⭐</span>
+      ${h.isMoney ? '<span style="color:#43E97B;font-size:.68rem;font-weight:800;">💰</span>' : ''}
+      <span style="color:var(--muted);font-size:.65rem;">${h.t}</span>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════
+//  PROFILE
+// ══════════════════════════════════════════════════════
+const ACHIEVEMENTS = [
+  {id:'g1', ico:'🎮', name:'Primeiro Jogo!',       desc:'Complete seu primeiro jogo'},
+  {id:'t1', ico:'🧹', name:'Super Ajudante!',       desc:'Complete sua primeira tarefa'},
+  {id:'g5', ico:'🏅', name:'Maratonista!',           desc:'Complete 5 jogos'},
+  {id:'t10',ico:'🏆', name:'Campeão das Tarefas!',  desc:'Complete 10 tarefas'},
+  {id:'s50',ico:'⭐', name:'Colecionador!',          desc:'Ganhe 50 estrelas'},
+  {id:'c1', ico:'🦁', name:'Corajoso!',              desc:'Supere 1 desafio de coragem'},
+  {id:'c5', ico:'🛡️', name:'Guerreiro dos Medos!',  desc:'Supere 5 desafios de coragem'},
+  {id:'f1', ico:'💜', name:'Abriu o Coração!',      desc:'Fez a 1ª sessão com a Lua'},
+];
+
+function renderProfile() {
+  const l = getLevel(S.totalXP), pct = getLvlPct(S.totalXP);
+  document.getElementById('p-lvl').textContent    = `Nível ${l} • ${LVL_NAMES[Math.min(l-1,9)]}`;
+  document.getElementById('p-xpbar').style.width  = pct + '%';
+  document.getElementById('p-xp-lbl').textContent = `XP: ${S.totalXP} — falta ${Math.max(0, LVL_XP[Math.min(l,9)]-S.totalXP)} p/ próx.`;
+  document.getElementById('ps-stars').textContent  = S.totalStars;
+  document.getElementById('ps-games').textContent  = S.gamesEver;
+  document.getElementById('ps-courage').textContent = S.couragesEver;
+}
+function renderAch() {
+  document.getElementById('ach-list').innerHTML = ACHIEVEMENTS.map(a => `
+    <div class="ach-item${S.achDone[a.id]?'':' locked'}">
+      <span style="font-size:1.6rem;">${a.ico}</span>
+      <div style="flex:1;"><div style="font-weight:800;font-size:.86rem;">${a.name}</div><div style="font-size:.68rem;color:var(--muted);font-weight:600;">${a.desc}</div></div>
+      ${S.achDone[a.id] ? '<span style="color:var(--p3);">✅</span>' : '<span style="color:var(--muted);">🔒</span>'}
+    </div>`).join('');
+}
+async function checkAch() {
+  const toUnlock = [];
+  if (!S.achDone['g1'] && S.gamesEver >= 1)   toUnlock.push('g1');
+  if (!S.achDone['t1'] && S.tasksEver >= 1)    toUnlock.push('t1');
+  if (!S.achDone['g5'] && S.gamesEver >= 5)    toUnlock.push('g5');
+  if (!S.achDone['t10']&& S.tasksEver >= 10)   toUnlock.push('t10');
+  if (!S.achDone['s50']&& S.totalStars >= 50)  toUnlock.push('s50');
+  if (!S.achDone['c1'] && S.couragesEver >= 1) toUnlock.push('c1');
+  if (!S.achDone['c5'] && S.couragesEver >= 5) toUnlock.push('c5');
+  if (!S.achDone['f1'] && S.feelLog.length>=1) toUnlock.push('f1');
+  for (const id of toUnlock) {
+    S.achDone[id] = true;
+    const a = ACHIEVEMENTS.find(x=>x.id===id);
+    setTimeout(() => toast(`🏆 Conquista: ${a?.name}!`), 800);
+    if (SB) await SB.from('rafael_achievements').upsert({ achievement_id: id, unlocked: true, unlocked_at: new Date().toISOString() });
+  }
+  if (toUnlock.length) renderAch();
+}
+
+// ══════════════════════════════════════════════════════
+//  MAMA PANEL
+// ══════════════════════════════════════════════════════
+let mamaUnlocked = false;
+function pnext(i) { const v=document.getElementById('p'+i).value; if(v&&i<3)document.getElementById('p'+(i+1)).focus(); }
+function checkPin() {
+  const pin = [0,1,2,3].map(i=>document.getElementById('p'+i).value).join('');
+  if (pin==='1234') {
+    mamaUnlocked = true;
+    document.getElementById('mama-lock-view').style.display='none';
+    document.getElementById('mama-panel-view').style.display='block';
+    renderMamaContent();
+  } else {
+    document.getElementById('pin-err').style.display='block';
+    [0,1,2,3].forEach(i=>{const e=document.getElementById('p'+i);e.value='';e.style.borderColor='var(--p2)';});
+    document.getElementById('p0').focus();
+    setTimeout(()=>[0,1,2,3].forEach(i=>document.getElementById('p'+i).style.borderColor=''),1500);
+  }
+}
+function mamaLock() {
+  mamaUnlocked=false;
+  document.getElementById('mama-lock-view').style.display='block';
+  document.getElementById('mama-panel-view').style.display='none';
+  [0,1,2,3].forEach(i=>document.getElementById('p'+i).value='');
+  document.getElementById('pin-err').style.display='none';
+}
+function renderMamaContent() {
+  const fl = S.feelLog||[], cl = S.courageLog||[];
+  const alert = fl.filter(s=>s.needsAttn).length;
+  const courageDone = Object.keys(S.courageDone).filter(k=>S.courageDone[k]).length;
+  const feelCount = {};
+  fl.forEach(s=>{feelCount[s.feelingLabel]=(feelCount[s.feelingLabel]||0)+1;});
+  const topFeel = Object.entries(feelCount).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const totalMoney = Object.values(S.rateio).reduce((acc,r)=>acc+(r.money||0),0);
+
+  document.getElementById('mama-content').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:13px;">
+      <div style="background:linear-gradient(135deg,rgba(176,107,255,.12),rgba(255,107,206,.08));border:1.5px solid rgba(176,107,255,.22);border-radius:13px;padding:12px;text-align:center;">
+        <div style="font-size:1.6rem;font-weight:900;font-family:'Baloo 2',cursive;color:#d4b0ff;">${fl.length}</div>
+        <div style="font-size:.65rem;color:var(--muted);font-weight:700;">SESSÕES COM A LUA</div>
+      </div>
+      <div style="background:${alert>0?'linear-gradient(135deg,rgba(255,193,7,.12),rgba(255,150,50,.08))':'linear-gradient(135deg,rgba(67,233,123,.08),rgba(0,200,100,.06))'};border:1.5px solid ${alert>0?'rgba(255,193,7,.28)':'rgba(67,233,123,.22)'};border-radius:13px;padding:12px;text-align:center;">
+        <div style="font-size:1.6rem;font-weight:900;font-family:'Baloo 2',cursive;color:${alert>0?'#ffe082':'#a0ffc8'};">${alert}</div>
+        <div style="font-size:.65rem;color:var(--muted);font-weight:700;">${alert>0?'⚠️ ATENÇÃO':'✅ SEM ALERTAS'}</div>
+      </div>
+      <div style="background:rgba(79,195,247,.07);border:1.5px solid rgba(79,195,247,.18);border-radius:13px;padding:12px;text-align:center;">
+        <div style="font-size:1.6rem;font-weight:900;font-family:'Baloo 2',cursive;color:#4FC3F7;">${courageDone}</div>
+        <div style="font-size:.65rem;color:var(--muted);font-weight:700;">CORAGENS SUPERADAS</div>
+      </div>
+      <div style="background:rgba(255,215,0,.06);border:1.5px solid rgba(255,215,0,.15);border-radius:13px;padding:12px;text-align:center;">
+        <div style="font-size:1.3rem;font-weight:900;font-family:'Baloo 2',cursive;color:var(--gold);">R$ ${totalMoney.toFixed(2).replace('.',',')}</div>
+        <div style="font-size:.65rem;color:var(--muted);font-weight:700;">MESADA ACUMULADA</div>
+      </div>
+    </div>
+    ${alert>0?`<div style="background:rgba(255,193,7,.07);border-left:3px solid #ffc107;border-radius:0 12px 12px 0;padding:10px 13px;margin-bottom:12px;font-size:.78rem;color:#ffe082;font-weight:600;line-height:1.5;">⚠️ <b>Atenção:</b> Em ${alert} sessão(ões) o Rafael relatou sentimentos muito intensos. Um abraço e uma conversa aberta podem ajudar muito. Se persistir, considere apoio de psicólogo infantil.</div>`:''}
+    ${topFeel.length?`
+    <div class="rpt-card" style="margin-bottom:12px;">
+      <div class="rpt-hdr"><span style="font-family:'Baloo 2',cursive;font-weight:800;font-size:.86rem;color:#d4b0ff;">📊 Sentimentos mais frequentes</span></div>
+      <div class="rpt-body">${topFeel.map(([f,n])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="font-size:1.3rem;">${FEELINGS.find(x=>x.label===f)?.e||'😊'}</span><span style="font-weight:700;font-size:.86rem;flex:1;">${f}</span><span style="font-family:'Baloo 2',cursive;font-weight:900;font-size:.9rem;color:var(--gold);">${n}x</span></div>`).join('')}</div>
+    </div>`:''}
+    <div style="font-family:'Baloo 2',cursive;font-weight:800;font-size:.92rem;margin-bottom:8px;color:#d4b0ff;">🦁 Progresso dos Desafios de Coragem</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:13px;">
+      ${COURAGE_CATS.map(cat=>{
+        const items=COURAGE.filter(c=>c.cat===cat);
+        const done=items.filter(c=>S.courageDone[c.id]).length;
+        const color=items[0]?.color||'#fff';
+        return `<div style="background:var(--card);border:1px solid var(--border);border-radius:11px;padding:10px;text-align:center;">
+          <div style="font-size:1rem;">${cat.split(' ')[0]}</div>
+          <div style="font-family:'Baloo 2',cursive;font-weight:900;font-size:1.1rem;color:${color};">${done}/${items.length}</div>
+          <div class="pbar-wrap" style="margin-top:4px;"><div class="pbar" style="width:${done/items.length*100}%;background:${color};"></div></div>
+        </div>`;
+      }).join('')}
+    </div>
+    ${cl.length?`
+    <div style="font-family:'Baloo 2',cursive;font-weight:800;font-size:.9rem;margin-bottom:8px;color:#d4b0ff;">📋 Desafios Superados</div>
+    ${cl.slice(0,6).map(c=>`<div class="rpt-card" style="margin-bottom:8px;"><div class="rpt-hdr"><span style="font-family:'Baloo 2',cursive;font-weight:800;font-size:.8rem;color:#d4b0ff;">🦁 ${c.name}</span><span style="font-size:.65rem;color:var(--muted);">${c.date}</span></div><div class="rpt-body"><div class="rpt-advice" style="margin-top:0;">👩 ${c.mama}</div></div></div>`).join('')}`:''}
+    <div style="font-family:'Baloo 2',cursive;font-weight:800;font-size:.9rem;margin:12px 0 8px;color:#d4b0ff;">💜 Sessões com a Lua</div>
+    ${fl.length===0?'<div style="color:var(--muted);font-size:.8rem;text-align:center;padding:14px;">Nenhuma sessão ainda. Rafael pode iniciar em "Como você está?" na tela inicial! 🌙</div>':
+    fl.slice(0,8).map(s=>`<div class="rpt-card"><div class="rpt-hdr"><span style="font-size:.8rem;font-family:'Baloo 2',cursive;font-weight:800;color:#d4b0ff;">📅 ${s.date} às ${s.time}</span>${s.needsAttn?'<span style="background:rgba(255,193,7,.18);border:1px solid rgba(255,193,7,.35);border-radius:50px;padding:2px 8px;font-size:.65rem;font-weight:800;color:#ffe082;">⚠️</span>':''}</div><div class="rpt-body"><div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;"><span style="font-size:1.8rem;">${s.emoji}</span><div><div style="font-weight:800;font-size:.88rem;">Sentimento: <b>${s.feelingLabel}</b></div><div style="font-size:.7rem;color:var(--muted);font-weight:600;">Intensidade: ${s.intensity==='low'?'😌 Pouquinho':s.intensity==='mid'?'😟 Médio':'😰 Muito forte'}</div></div></div><span class="rtag">📍 ${s.context}</span><div class="rpt-advice" style="margin-top:8px;">💡 ${s.advice}</div>${s.needsAttn?`<div class="rpt-alert">👩 Sentimento muito intenso. Um abraço e conversa aberta podem ajudar muito. 💜</div>`:''}</div></div>`).join('')}
+  `;
+}
+
+// ══════════════════════════════════════════════════════
+//  FEELINGS GAME
+// ══════════════════════════════════════════════════════
+const FEELINGS = [
+  {e:'😄',label:'Feliz',    tag:'Feliz',    color:'#FFD700'},
+  {e:'😢',label:'Triste',   tag:'Triste',   color:'#4FC3F7'},
+  {e:'😡',label:'Bravo',    tag:'Bravo',    color:'#FF6584'},
+  {e:'😨',label:'Com medo', tag:'Com medo', color:'#b06bff'},
+  {e:'😌',label:'Calmo',    tag:'Calmo',    color:'#43E97B'},
+  {e:'😕',label:'Confuso',  tag:'Confuso',  color:'#F7971E'},
+  {e:'🤩',label:'Animado',  tag:'Animado',  color:'#ff6bce'},
+  {e:'😔',label:'Chateado', tag:'Chateado', color:'#7B8DB0'},
+];
+const LUA_ADVICE = {
+  'Feliz':   'Quando estiver feliz, compartilhe essa energia com as pessoas que você ama! A alegria cresce quando dividida. 🌟',
+  'Triste':  'Quando estiver triste, peça um abraço para a mamãe. Chorar faz parte — não há nada de errado nisso. 💙',
+  'Bravo':   'Quando a raiva aparecer, respira fundo 3 vezes antes de falar. Isso ajuda o cérebro a pensar melhor. 🌬️',
+  'Com medo':'O medo avisa que algo nos preocupa. Conta para a mamãe — ela pode te ajudar a se sentir mais seguro. 🛡️',
+  'Calmo':   'A calma é um superpoder! Guarda esse sentimento fazendo algo que você ama quando estiver ansioso. 🌿',
+  'Confuso': 'Quando tudo parecer confuso, desenha o que está sentindo. Isso ajuda a organizar os pensamentos! ✏️',
+  'Animado': 'Que energia boa! Usa essa animação para aprender algo novo ou fazer alguém feliz hoje! ⚡',
+  'Chateado':'Ficar chateado faz parte. Tenta falar com a mamãe — isso alivia muito o coração. 🫂',
+};
+const LUA_AFTER = {
+  'Feliz':   'Que maravilha! Fico muito feliz que você esteja bem! 😄 O que aconteceu de legal hoje?',
+  'Triste':  'Tudo bem ficar triste às vezes. Eu te ouço. 💙 Pode me contar o que te deixou assim?',
+  'Bravo':   'Entendo! Às vezes a gente fica bravo mesmo. Respira fundo... O que aconteceu?',
+  'Com medo':'Não precisa ter medo, eu estou aqui! 🤗 O que te assustou?',
+  'Calmo':   'Que legal estar calmo! Isso é ótimo para o coração. 🌿 Como foi seu dia?',
+  'Confuso': 'Às vezes a vida parece complicada. Mas juntos entendemos! O que te deixou confuso?',
+  'Animado': 'Uau, que energia! 🤩 Me conta o que está te deixando assim!',
+  'Chateado':'Sinto muito que esteja chateado. 🫂 Quer me contar o que aconteceu?',
+};
+const LUA_INT = {
+  low: 'Ainda bem que é pouquinho! Falar sobre isso já é um grande passo. 🌱',
+  mid: 'Entendo... Às vezes esse sentimento cresce. Mas falar sobre ele já ajuda muito! 💬',
+  high:'Isso parece pesado de carregar. Fico feliz que você me contou. Você não está sozinho! 🫂',
+};
+let feelSt = { step:0, feeling:null, emoji:null, intensity:null, context:'' };
+function startFeelings() { feelSt={step:0,feeling:null,emoji:null,intensity:null,context:''}; renderFeelStep(); }
+function renderFeelStep() {
+  const el=document.getElementById('feel-content');
+  const dots=document.getElementById('feel-dots');
+  const total=6;
+  dots.innerHTML=[...Array(total)].map((_,i)=>`<div class="dot ${i<feelSt.step?'done':i===feelSt.step?'cur':''}"></div>`).join('');
+  const s=feelSt.step;
+  if(s===0){el.innerHTML=`<div style="text-align:center;margin-bottom:13px;"><div class="lua-av">🌙</div><div style="font-family:'Baloo 2',cursive;font-size:.75rem;font-weight:800;color:var(--lua);margin-bottom:3px;">🌙 LUA — Sua amiga psicóloga</div></div><div class="lua-bub"><div class="lua-txt">Oi, Rafael! Eu sou a <b>Lua</b> 🌙 — sua amiga especial que está sempre aqui para te ouvir.<br><br>Tudo que você me contar fica guardado com carinho. Pode falar à vontade! 💜</div></div><button onclick="feelNext()" style="width:100%;background:linear-gradient(135deg,var(--lua),var(--lua2));border:none;border-radius:13px;padding:13px;color:#fff;font-family:'Baloo 2',cursive;font-weight:800;font-size:.95rem;cursor:pointer;margin-top:4px;">Vamos começar! 💜</button>`;}
+  else if(s===1){el.innerHTML=`<div class="lua-bub"><div class="lua-txt">Hoje, como você está se sentindo? Escolhe o que mais combina! 👇</div></div><div class="feel-grid">${FEELINGS.map(f=>`<button class="felbtn" onclick="selectFeeling('${f.label}','${f.e}')" style="${feelSt.feeling===f.label?`border-color:${f.color};background:rgba(255,255,255,.08);`:''}"><span class="fe">${f.e}</span><span class="fl">${f.label}</span></button>`).join('')}</div>`;}
+  else if(s===2){el.innerHTML=`<div style="background:rgba(108,99,255,.2);border-radius:12px;padding:9px 13px;margin-bottom:10px;font-size:.86rem;font-weight:700;text-align:right;color:#d0c8ff;">${feelSt.emoji} Me sinto <b>${feelSt.feeling}</b></div><div class="lua-bub"><div class="lua-nm">🌙 LUA</div><div class="lua-txt">${LUA_AFTER[feelSt.feeling]||'Me conta mais...'}</div></div><div style="margin-top:4px;">${[{i:'🏫',l:'Na escola / nas aulas'},{i:'🏠',l:'Em casa / com a família'},{i:'👫',l:'Com meus amigos'},{i:'😴',l:'Comigo mesmo'},{i:'🌀',l:'Não sei ainda'}].map(c=>`<button class="ctx-btn" onclick="selectCtx('${c.l}')"><span style="font-size:1.3rem;">${c.i}</span>${c.l}</button>`).join('')}</div>`;}
+  else if(s===3){el.innerHTML=`<div style="background:rgba(255,255,255,.04);border-radius:11px;padding:8px 12px;margin-bottom:10px;font-size:.82rem;font-weight:700;text-align:right;color:#d0c8ff;">📍 ${feelSt.context}</div><div class="lua-bub"><div class="lua-nm">🌙 LUA</div><div class="lua-txt">Obrigada por me contar! E esse sentimento está dentro de você muito forte ou só um pouquinho?</div></div><div class="int-row"><button class="ibtn${feelSt.intensity==='low'?' on':''}" onclick="selectInt('low')">😌 Pouquinho</button><button class="ibtn${feelSt.intensity==='mid'?' on':''}" onclick="selectInt('mid')">😟 Médio</button><button class="ibtn${feelSt.intensity==='high'?' on':''}" onclick="selectInt('high')">😰 Muito forte</button></div>`;}
+  else if(s===4){const advice=LUA_ADVICE[feelSt.feeling]||'Você é incrível por compartilhar seus sentimentos! 💜';el.innerHTML=`<div class="lua-bub"><div class="lua-nm">🌙 LUA</div><div class="lua-txt">${LUA_INT[feelSt.intensity]}<br><br>Deixa eu te dar um conselho especial... 💜<br><br><span style="color:#c4ffd4;font-style:italic;">${advice}</span></div></div><button onclick="feelNext()" style="width:100%;background:linear-gradient(135deg,var(--lua),var(--lua2));border:none;border-radius:13px;padding:12px;color:#fff;font-family:'Baloo 2',cursive;font-weight:800;font-size:.92rem;cursor:pointer;margin-top:10px;">Entendi! Obrigado, Lua 💜</button>`;}
+  else if(s===5){const f=FEELINGS.find(x=>x.label===feelSt.feeling)||FEELINGS[0];saveFeel();el.innerHTML=`<div style="text-align:center;"><div style="font-size:3.5rem;margin-bottom:8px;">${f.e}</div><div style="font-family:'Baloo 2',cursive;font-size:1.2rem;font-weight:900;color:#d4b0ff;margin-bottom:5px;">Sessão concluída! 🌟</div><div style="color:var(--muted);font-size:.8rem;font-weight:600;line-height:1.5;margin-bottom:13px;">Obrigada por confiar em mim hoje, Rafael. Você foi muito corajoso!<br><br><b style="color:#d4b0ff;">Você nunca está sozinho.</b> 💜</div><div class="info-banner info-green" style="margin-bottom:13px;"><span>✅</span><div>Sessão salva para a mamãe ver com carinho!</div></div><button onclick="finishFeelings()" style="width:100%;background:linear-gradient(135deg,var(--lua),var(--lua2));border:none;border-radius:13px;padding:12px;color:#fff;font-family:'Baloo 2',cursive;font-weight:800;font-size:.92rem;cursor:pointer;">⭐ Terminar e ganhar estrelas!</button></div>`;}
+}
+function selectFeeling(label,emoji){feelSt.feeling=label;feelSt.emoji=emoji;feelNext();}
+function selectCtx(ctx){feelSt.context=ctx;feelNext();}
+function selectInt(l){feelSt.intensity=l;feelNext();}
+function feelNext(){feelSt.step++;renderFeelStep();}
+async function saveFeel(){
+  const f=FEELINGS.find(x=>x.label===feelSt.feeling)||FEELINGS[0];
+  const session={feeling:f.tag,feeling_label:f.label,emoji:f.e,intensity:feelSt.intensity||'low',context:feelSt.context||'Não informado',advice:LUA_ADVICE[feelSt.feeling]||'',needs_attention:feelSt.intensity==='high'&&['Triste','Bravo','Com medo','Chateado'].includes(feelSt.feeling)};
+  S.feelLog.unshift({date:new Date().toLocaleDateString('pt-BR'),time:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),feeling:f.tag,feelingLabel:f.label,emoji:f.e,intensity:session.intensity,context:session.context,advice:session.advice,needsAttn:session.needs_attention});
+  if(SB){await SB.from('rafael_feel_sessions').insert(session);}
+}
+async function finishFeelings(){
+  closeM('feelings');
+  S.gamesEver++;S.totalXP+=50;
+  await earnStars(8,'💜','Sessão emocional com a Lua',true);
+  checkAch();updateHome();
+}
+
+// ══════════════════════════════════════════════════════
+//  GAMES (Math, Memory, Words, Logic, Science, Quiz)
+// ══════════════════════════════════════════════════════
+let mt={q:0,score:0,ans:false,qs:[]};
+function startMath(){mt={q:0,score:0,ans:false,qs:Array.from({length:5},()=>{const ops=['+','-','×'],op=ops[Math.floor(Math.random()*3)];let a,b,ans;if(op==='+'){a=Math.floor(Math.random()*25)+1;b=Math.floor(Math.random()*25)+1;ans=a+b;}else if(op==='-'){a=Math.floor(Math.random()*25)+5;b=Math.floor(Math.random()*a)+1;ans=a-b;}else{a=Math.floor(Math.random()*10)+1;b=Math.floor(Math.random()*10)+1;ans=a*b;}const w=new Set();while(w.size<3){const x=ans+Math.floor(Math.random()*12)-6;if(x!==ans&&x>=0)w.add(x);}return{q:`${a} ${op} ${b} = ?`,ans,opts:[ans,...w].sort(()=>Math.random()-.5)};})};renderMath();}
+function renderMath(){const q=mt.qs[mt.q];document.getElementById('mt-qtext').textContent=q.q;document.getElementById('mt-score').textContent=mt.score;document.getElementById('mt-q').textContent=mt.q+1;document.getElementById('mt-fb').className='fb';const o=document.getElementById('mt-opts');o.innerHTML='';q.opts.forEach(v=>{const b=document.createElement('button');b.className='mopt';b.textContent=v;b.onclick=()=>ansMath(v,q.ans,b);o.appendChild(b);});mt.ans=false;}
+function ansMath(v,ans,btn){if(mt.ans)return;mt.ans=true;const fb=document.getElementById('mt-fb');if(v===ans){btn.classList.add('ok');mt.score+=20;fb.textContent='🎉 Correto! Arrasou!';fb.className='fb show ok';}else{btn.classList.add('fail');document.querySelectorAll('#mt-opts .mopt').forEach(b=>{if(+b.textContent===ans)b.classList.add('ok');});fb.textContent=`😅 Era ${ans}. Continua!`;fb.className='fb show fail';}setTimeout(()=>{mt.q++;if(mt.q>=5)finishGame('math',mt.score,Math.round(mt.score/100*15));else renderMath();},1100);}
+
+const MEMEMS=['🐶','🐱','🦊','🐸','🦋','🌸','🍕','⚽'];
+let mm={f:[],m:0,t:0,l:false};
+function startMemory(){mm={f:[],m:0,t:0,l:false};const p=[...MEMEMS,...MEMEMS].sort(()=>Math.random()-.5);const g=document.getElementById('mm-grid');g.innerHTML='';document.getElementById('mm-p').textContent='0';document.getElementById('mm-t').textContent='0';document.getElementById('mm-fb').className='fb';p.forEach(e=>{const c=document.createElement('div');c.className='mmc';c.innerHTML=`<span class="mb2">❓</span><span class="mf">${e}</span>`;c.dataset.e=e;c.onclick=()=>flipM(c,e);g.appendChild(c);});}
+function flipM(card,e){if(mm.l||card.classList.contains('flip')||card.classList.contains('match'))return;card.classList.add('flip');mm.f.push({card,e});if(mm.f.length===2){mm.t++;document.getElementById('mm-t').textContent=mm.t;mm.l=true;const[a,b]=mm.f;if(a.e===b.e){a.card.classList.add('match');b.card.classList.add('match');mm.m++;document.getElementById('mm-p').textContent=mm.m;mm.f=[];mm.l=false;if(mm.m===8)setTimeout(()=>finishGame('memory',mm.t,Math.max(3,10-Math.floor(mm.t/4))),400);}else{setTimeout(()=>{a.card.classList.remove('flip');b.card.classList.remove('flip');mm.f=[];mm.l=false;},850);}}}
+
+const WORDS={easy:[{w:'GATO',h:'Animal que faz miau 🐱'},{w:'BOLA',h:'Usada para jogar futebol ⚽'},{w:'CASA',h:'Lugar onde você mora 🏠'},{w:'FLOR',h:'Planta bonita e colorida 🌸'},{w:'PATO',h:'Ave que faz quá-quá 🦆'},{w:'MAPA',h:'Mostra os lugares do mundo 🗺️'}],medium:[{w:'ESCOLA',h:'Lugar onde você aprende 📚'},{w:'AMIGO',h:'Pessoa com quem você brinca 👫'},{w:'LIVRO',h:'Você lê para aprender 📖'},{w:'CHUVA',h:'Água que cai do céu 🌧️'},{w:'PIANO',h:'Instrumento musical 🎹'},{w:'VERDE',h:'Cor das plantas 🌿'}],hard:[{w:'BORBOLETA',h:'Inseto colorido que voa 🦋'},{w:'ELEFANTE',h:'Maior animal terrestre 🐘'},{w:'CHOCOLATE',h:'Doce feito de cacau 🍫'},{w:'TARTARUGA',h:'Animal com casca nas costas 🐢'},{w:'COMPUTADOR',h:'Máquina para trabalhar 💻'},{w:'BIBLIOTECA',h:'Lugar com muitos livros 📚'}]};
+let wd={q:0,score:0,cur:[],entered:[],usedBtns:[],list:[]};
+function startWords(){const l=getLevel(S.totalXP),diff=getDiff(l);const pool=[...WORDS[diff]].sort(()=>Math.random()-.5).slice(0,4);wd={q:0,score:0,cur:[],entered:[],usedBtns:[],list:pool};document.getElementById('wd-lvl').textContent=l;document.getElementById('wd-xpb').style.width=getLvlPct(S.totalXP)+'%';document.getElementById('wd-score').textContent='0';renderWordQ();}
+function renderWordQ(){const item=wd.list[wd.q];wd.cur=item.w.split('');wd.entered=Array(wd.cur.length).fill('');wd.usedBtns=[];document.getElementById('wd-hint').textContent='💡 '+item.h;document.getElementById('wd-q').textContent=wd.q+1;document.getElementById('wd-fb').className='fb';renderWordBlanks();const extras='ABCDEFGHIJKLMNOPRSTUVZ'.split('').filter(l=>!wd.cur.includes(l)).sort(()=>Math.random()-.5).slice(0,5);const all=[...wd.cur,...extras].sort(()=>Math.random()-.5);const lc=document.getElementById('wd-letts');lc.innerHTML='';all.forEach(l=>{const b=document.createElement('button');b.className='lbtn';b.textContent=l;b.onclick=()=>pickL(l,b);lc.appendChild(b);});}
+function renderWordBlanks(){document.getElementById('wd-blanks').innerHTML=wd.entered.map(l=>`<div class="wl${l?' filled':''}">${l||''}</div>`).join('');}
+function pickL(l,btn){if(btn.classList.contains('used'))return;const i=wd.entered.indexOf('');if(i===-1)return;wd.entered[i]=l;btn.classList.add('used');wd.usedBtns.push(btn);renderWordBlanks();if(!wd.entered.includes('')){const typed=wd.entered.join(''),correct=wd.cur.join('');const fb=document.getElementById('wd-fb');if(typed===correct){wd.score+=25;fb.textContent='🎉 Correto! Você montou a palavra!';fb.className='fb show ok';}else{fb.textContent=`😅 Era "${correct}". Continua!`;fb.className='fb show fail';}document.getElementById('wd-score').textContent=wd.score;setTimeout(()=>{wd.q++;if(wd.q>=4)finishGame('words',wd.score,Math.round(wd.score/100*12));else renderWordQ();},1300);}}
+function delLetter(){let last=-1;for(let i=wd.entered.length-1;i>=0;i--){if(wd.entered[i]!==''){last=i;break;}}if(last===-1)return;wd.entered[last]='';if(wd.usedBtns.length>0)wd.usedBtns.pop().classList.remove('used');renderWordBlanks();document.getElementById('wd-fb').className='fb';}
+
+const LOGICQS=[{q:'🍎 João tem 3 maçãs, ganha 4 e dá 2 para a irmã. Com quantas ele fica?',opts:['4','5','3','6'],ans:1},{q:'🔢 Qual vem depois: 2, 4, 6, 8, ...?',opts:['9','10','11','12'],ans:1},{q:'🎨 Qual figura tem 4 lados iguais?',opts:['Triângulo','Círculo','Quadrado','Retângulo'],ans:2},{q:'🐾 1 gato tem 4 patas, quantas patas têm 3 gatos?',opts:['8','10','12','14'],ans:2},{q:'⏰ São 3h da tarde, passam 2 horas. Que horas são?',opts:['4h','5h','6h','7h'],ans:1},{q:'🔄 Complete: 🔴🔵🔴🔵... o próximo é?',opts:['🟡','🔴','🔵','🟢'],ans:2},{q:'🧩 Qual número completa: 15, 12, 9, __?',opts:['8','7','6','5'],ans:2}];
+let lg={q:0,score:0,ans:false,qs:[]};
+function startLogic(){lg={q:0,score:0,ans:false,qs:[...LOGICQS].sort(()=>Math.random()-.5).slice(0,4)};renderLogicQ();}
+function renderLogicQ(){const q=lg.qs[lg.q];document.getElementById('lg-qtext').textContent=q.q;document.getElementById('lg-score').textContent=lg.score;document.getElementById('lg-q').textContent=lg.q+1;document.getElementById('lg-fb').className='fb';const o=document.getElementById('lg-opts');o.innerHTML='';q.opts.forEach((op,i)=>{const b=document.createElement('button');b.className='lopt';b.textContent=op;b.onclick=()=>ansLogic(i,q.ans,b,o);o.appendChild(b);});lg.ans=false;}
+function ansLogic(i,ans,btn,opts){if(lg.ans)return;lg.ans=true;const fb=document.getElementById('lg-fb');if(i===ans){btn.classList.add('ok');lg.score+=25;fb.textContent='🧠 Lógica perfeita!';fb.className='fb show ok';}else{btn.classList.add('fail');opts.children[ans].classList.add('ok');fb.textContent='🤔 Quase! Veja a resposta.';fb.className='fb show fail';}document.getElementById('lg-score').textContent=lg.score;setTimeout(()=>{lg.q++;if(lg.q>=4)finishGame('logic',lg.score,Math.round(lg.score/100*15));else renderLogicQ();},1100);}
+
+const SCIQS=[{q:'🌍 Qual planeta vivemos?',opts:['Marte','Saturno','Terra','Vênus'],ans:2},{q:'☀️ O que o Sol dá para as plantas crescerem?',opts:['Água','Luz','Terra','Ar'],ans:1},{q:'🦋 Como se chama a transformação da lagarta?',opts:['Evolução','Metamorfose','Crescimento','Mutação'],ans:1},{q:'💧 De onde vem a água da chuva?',opts:['Dos rios','Das nuvens','Do mar','Das montanhas'],ans:1},{q:'🌡️ Água vira vapor quando está muito...?',opts:['Fria','Gelada','Quente','Seca'],ans:2},{q:'🌙 O que ilumina o céu à noite?',opts:['O Sol','As estrelas','A Lua','As nuvens'],ans:1}];
+let sc={q:0,score:0,ans:false,qs:[]};
+function startScience(){sc={q:0,score:0,ans:false,qs:[...SCIQS].sort(()=>Math.random()-.5).slice(0,4)};renderSciQ();}
+function renderSciQ(){const q=sc.qs[sc.q];document.getElementById('sc-qtext').textContent=q.q;document.getElementById('sc-score').textContent=sc.score;document.getElementById('sc-q').textContent=sc.q+1;document.getElementById('sc-fb').className='fb';const o=document.getElementById('sc-opts');o.innerHTML='';q.opts.forEach((op,i)=>{const b=document.createElement('button');b.className='lopt';b.textContent=op;b.onclick=()=>ansSci(i,q.ans,b,o);o.appendChild(b);});sc.ans=false;}
+function ansSci(i,ans,btn,opts){if(sc.ans)return;sc.ans=true;const fb=document.getElementById('sc-fb');if(i===ans){btn.classList.add('ok');sc.score+=25;fb.textContent='🔬 Você é um cientista!';fb.className='fb show ok';}else{btn.classList.add('fail');opts.children[ans].classList.add('ok');fb.textContent='🤓 Era outra! Mas aprendeu!';fb.className='fb show fail';}document.getElementById('sc-score').textContent=sc.score;setTimeout(()=>{sc.q++;if(sc.q>=4)finishGame('science',sc.score,Math.round(sc.score/100*12));else renderSciQ();},1100);}
+
+const QUIZQS=[{q:'🎨 Misturar azul + amarelo faz qual cor?',opts:['Laranja','Verde','Roxo','Rosa'],ans:1},{q:'🌎 Qual é o maior país do mundo?',opts:['EUA','China','Brasil','Rússia'],ans:3},{q:'🎵 Quantas notas musicais existem?',opts:['5','6','7','8'],ans:2},{q:'🦁 O "Rei da Selva" é qual animal?',opts:['Tigre','Leão','Elefante','Gorila'],ans:1},{q:'❤️ O que é mais importante ter com os amigos?',opts:['Brigas','Respeito e amizade','Competição','Ignorar problemas'],ans:1},{q:'🏋️ O que mantém o corpo saudável?',opts:['Só dormir','Só celular','Exercício, sono e alimentação','Só frutas'],ans:2}];
+let qz={q:0,score:0,ans:false,qs:[]};
+function startQuiz(){qz={q:0,score:0,ans:false,qs:[...QUIZQS].sort(()=>Math.random()-.5).slice(0,4)};renderQuizQ();}
+function renderQuizQ(){const q=qz.qs[qz.q];document.getElementById('qz-qtext').textContent=q.q;document.getElementById('qz-score').textContent=qz.score;document.getElementById('qz-q').textContent=qz.q+1;document.getElementById('qz-fb').className='fb';const o=document.getElementById('qz-opts');o.innerHTML='';q.opts.forEach((op,i)=>{const b=document.createElement('button');b.className='lopt';b.textContent=op;b.onclick=()=>ansQuiz(i,q.ans,b,o);o.appendChild(b);});qz.ans=false;}
+function ansQuiz(i,ans,btn,opts){if(qz.ans)return;qz.ans=true;const fb=document.getElementById('qz-fb');if(i===ans){btn.classList.add('ok');qz.score+=25;fb.textContent='🌟 Correto! Você sabe muito!';fb.className='fb show ok';}else{btn.classList.add('fail');opts.children[ans].classList.add('ok');fb.textContent='📚 Continue aprendendo!';fb.className='fb show fail';}document.getElementById('qz-score').textContent=qz.score;setTimeout(()=>{qz.q++;if(qz.q>=4)finishGame('quiz',qz.score,Math.round(qz.score/100*10));else renderQuizQ();},1100);}
+
+function openGame(t){document.getElementById('mo-'+t).classList.add('open');if(t==='math')startMath();if(t==='memory')startMemory();if(t==='words')startWords();if(t==='logic')startLogic();if(t==='science')startScience();if(t==='quiz')startQuiz();if(t==='feelings')startFeelings();}
+function closeM(t){document.getElementById('mo-'+t).classList.remove('open');}
+async function finishGame(type,score,stars){
+  closeM(type);
+  const earned=Math.max(1,stars);
+  const oldL=getLevel(S.totalXP);
+  S.totalXP+=score+earned*5;
+  S.gamesEver++;
+  const newL=getLevel(S.totalXP);
+  await earnStars(earned,'🎮','Completou um jogo',false);
+  checkAch();updateHome();
+  if(newL>oldL)setTimeout(()=>toast(`🆙 NÍVEL ${newL} DESBLOQUEADO! 🎉`),700);
+}
+
+// ══════════════════════════════════════════════════════
+//  FX
+// ══════════════════════════════════════════════════════
+let toastT;
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);}
+function spawnFX(){for(let i=0;i<7;i++){const s=document.createElement('div');s.className='sfx';s.textContent='⭐';const tx=(Math.random()-.5)*220,ty=-(Math.random()*200+60);s.style.cssText=`left:${25+Math.random()*50}%;top:40%;--tx:${tx}px;--ty:${ty}px;animation-delay:${i*0.07}s;`;document.body.appendChild(s);setTimeout(()=>s.remove(),1000);}}
+
+// ══════════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', async () => {
+  const savedUrl = localStorage.getItem('sb_url');
+  const savedKey = localStorage.getItem('sb_key');
+  if (savedUrl && savedKey) {
+    initSupabase(savedUrl, savedKey);
+    await loadAllData();
+  } else {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('setup-screen').style.display = 'flex';
+  }
+});
+</script>
+</body>
+</html>
