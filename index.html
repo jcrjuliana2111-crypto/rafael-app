@@ -27,8 +27,26 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 @keyframes spin{to{transform:rotate(360deg);}}
 #load-txt{font-family:'Baloo 2',cursive;font-weight:800;font-size:1rem;color:var(--muted);}
 
-/* SETUP SCREEN */
-#setup-screen{position:fixed;inset:0;background:var(--bg);z-index:990;
+/* LOGIN SCREEN */
+#login-screen{position:fixed;inset:0;background:var(--bg);z-index:995;
+  display:flex;align-items:center;justify-content:center;padding:20px;}
+.login-box{background:var(--card);border:1.5px solid rgba(108,99,255,.3);border-radius:24px;
+  padding:32px 24px;width:100%;max-width:360px;text-align:center;}
+.login-logo{font-size:3rem;margin-bottom:12px;}
+.login-title{font-family:'Baloo 2',cursive;font-size:1.4rem;font-weight:900;margin-bottom:4px;}
+.login-sub{color:var(--muted);font-size:.82rem;font-weight:600;margin-bottom:22px;line-height:1.4;}
+.login-input{width:100%;background:rgba(255,255,255,.06);border:1.5px solid var(--border);
+  border-radius:12px;color:var(--txt);font-family:'Nunito',sans-serif;font-weight:700;
+  font-size:1.1rem;padding:13px 16px;text-align:center;letter-spacing:2px;margin-bottom:12px;}
+.login-input:focus{outline:none;border-color:var(--p1);}
+.login-btn{width:100%;background:linear-gradient(135deg,var(--p1),#a78bfa);
+  border:none;border-radius:50px;padding:13px;color:#fff;
+  font-family:'Baloo 2',cursive;font-weight:800;font-size:1rem;cursor:pointer;
+  box-shadow:0 4px 16px rgba(108,99,255,.35);transition:all .15s;}
+.login-btn:hover{transform:translateY(-2px);}
+.login-err{color:var(--p2);font-size:.8rem;font-weight:700;margin-top:8px;display:none;}
+.login-shake{animation:shake .4s ease;}
+@keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-8px);}75%{transform:translateX(8px);}}
   display:none;align-items:center;justify-content:center;padding:20px;}
 .setup-box{background:var(--card);border:1.5px solid rgba(108,99,255,.3);border-radius:24px;
   padding:28px 22px;width:100%;max-width:400px;}
@@ -331,6 +349,19 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div id="load-txt">Carregando o App do Rafael...</div>
 </div>
 
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">⚡</div>
+    <div class="login-title">App do Rafael</div>
+    <div class="login-sub">Digite a senha para entrar</div>
+    <input class="login-input" type="password" id="login-pwd" placeholder="••••••••"
+      onkeydown="if(event.key==='Enter')doLogin()" autocomplete="off">
+    <button class="login-btn" onclick="doLogin()">🔓 Entrar</button>
+    <div class="login-err" id="login-err">Senha incorreta. Tente novamente!</div>
+  </div>
+</div>
+
 <!-- SETUP — aparece na 1ª vez -->
 <div id="setup-screen">
   <div class="setup-box">
@@ -443,6 +474,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <!-- RATEIO DETALHADO -->
   <div class="rateio-card">
     <h3>📊 Rateio da Mesada — Como é calculado</h3>
+    <div id="rateio-explain" style="font-size:.72rem;color:var(--muted);margin-bottom:12px;line-height:1.4;"></div>
     <div id="rateio-rows"></div>
     <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
       <span style="font-weight:800;font-size:.9rem;">Total acumulado</span>
@@ -696,14 +728,26 @@ async function saveState() {
 }
 
 // ══════════════════════════════════════════════════════
-//  RATEIO — cálculo detalhado por categoria
+//  RATEIO — R$100 ÷ total possível de estrelas no mês
+//  Sistema de dedução: atividades não feitas reduzem o valor
 // ══════════════════════════════════════════════════════
+function calcTotalPossibleStars() {
+  // Total de estrelas possíveis: todas as tarefas + todos os desafios de coragem + sessões Lua (estimado 4/mês) + jogos (estimado 8/mês)
+  const taskStars    = TASKS.reduce((a,t) => a + t.stars, 0);
+  const courageStars = COURAGE.reduce((a,c) => a + c.stars, 0);
+  const luaEstimate  = 4 * 8;   // 4 sessões estimadas × 8 estrelas cada
+  const gamesEstimate= 8 * 5;   // 8 jogos estimados × 5 estrelas médias
+  return taskStars + courageStars + luaEstimate + gamesEstimate;
+}
+
 async function calcRateio() {
   if (!SB) return;
-  const curMonth = getCurrentMonth();
-  const valorPorEstrela = S.cfg.money / Math.max(S.cfg.goal, 1);
 
-  // Contar estrelas por categoria neste mês
+  // Valor por estrela = R$100 ÷ total possível de estrelas no mês
+  const totalPossivel = calcTotalPossibleStars();
+  const valorPorEstrela = S.cfg.money / Math.max(totalPossivel, 1);
+
+  // Contar estrelas conquistadas por categoria neste mês
   const { data: hist } = await SB.from('rafael_history')
     .select('icon, stars, created_at')
     .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
@@ -716,12 +760,29 @@ async function calcRateio() {
     else if (h.icon === '🎮') rGames += h.stars;
   });
 
+  // Estrelas possíveis por categoria
+  const possTask    = TASKS.reduce((a,t) => a + t.stars, 0);
+  const possCourage = COURAGE.reduce((a,c) => a + c.stars, 0);
+
+  // Dedução: estrelas não feitas nas tarefas domésticas penalizam
+  const tasksDoneCount    = Object.keys(S.tasksDone).filter(k=>S.tasksDone[k]).length;
+  const tasksTotal        = TASKS.length;
+  const taskCompletionPct = tasksTotal > 0 ? tasksDoneCount / tasksTotal : 0;
+
+  // Bônus de conclusão: se fez 100% das tarefas, recebe 10% extra
+  const bonusTasks = taskCompletionPct === 1 ? possTask * valorPorEstrela * 0.1 : 0;
+
   S.rateio = {
-    tasks:    { stars: rTasks,    money: rTasks * valorPorEstrela * S.cfg.taskMult },
-    courage:  { stars: rCourage,  money: rCourage * valorPorEstrela * S.cfg.courageMult },
-    feelings: { stars: rFeelings, money: rFeelings * valorPorEstrela },
-    games:    { stars: rGames,    money: rGames * valorPorEstrela },
+    tasks:    { stars: rTasks,    poss: possTask,     money: rTasks * valorPorEstrela * S.cfg.taskMult,    bonus: bonusTasks },
+    courage:  { stars: rCourage,  poss: possCourage,  money: rCourage * valorPorEstrela * S.cfg.courageMult },
+    feelings: { stars: rFeelings, poss: 32,           money: rFeelings * valorPorEstrela },
+    games:    { stars: rGames,    poss: 40,           money: rGames * valorPorEstrela },
+    valorPorEstrela, totalPossivel,
   };
+
+  // Atualizar moneyStars baseado no total real ganho
+  S.moneyStars = rTasks + rCourage + rFeelings + rGames;
+  updateTopPills();
 }
 
 // ══════════════════════════════════════════════════════
@@ -896,6 +957,13 @@ const COURAGE = [
   {id:'m2',cat:'🏃 Corpo em Movimento',color:'#F7971E',e:'⚽',stars:6,name:'Movimento — Passo 2: Brincadeira',desc:'Fazer uma brincadeira ativa com a mamãe por 10 minutos.',lua:'Brincadeiras com quem a gente ama são as melhores! Pega-pega, bola, pular, dançar... Você escolhe! E depois vai dormir muito melhor! 🌙',tip:'💡 Você escolhe a brincadeira! Quando a gente escolhe, é muito mais divertido.',mama:'Deixe-o escolher totalmente. A autonomia é chave. Objetivo: criar memória positiva com atividade física.'},
   {id:'m3',cat:'🏃 Corpo em Movimento',color:'#F7971E',e:'📵',stars:8,name:'Movimento — Passo 3: 30 min sem telas',desc:'Ficar 30 minutos longe das telas fazendo algo ativo.',lua:'As telas são legais, mas o mundo lá fora é incrível! Hoje: 30 minutinhos sem celular. Você escolhe o que fazer! Depois me conta o que você descobriu! 🌈',tip:'💡 Combina com a mamãe o que vai fazer. Juntos é muito melhor!',mama:'Marco importante! Após os 30 minutos, pergunte: "Como você se sentiu?" Reforce a sensação boa. Aumente gradualmente.'},
   {id:'m4',cat:'🏃 Corpo em Movimento',color:'#F7971E',e:'🏆',stars:12,name:'Movimento — Campeão do Corpo!',desc:'Por uma semana, fazer pelo menos 15 minutos de atividade física por dia.',lua:'Uma semana inteira se movendo todo dia! Isso é algo que poucos adultos conseguem! Seu coração, pulmões, músculos — tudo agradece! Você é incrível, Rafael! 🌟',tip:'💡 Experimente uma atividade nova: natação, futsal, ciclismo, dança — o que mais der vontade!',mama:'🏆 Uma semana de movimento diário é transformador! Se possível, matricule-o em atividade que ele escolheu. Autonomia na escolha aumenta o engajamento.'},
+
+  // 🥦 SELETIVIDADE ALIMENTAR
+  {id:'f1',cat:'🥦 Explorando Alimentos',color:'#43E97B',e:'👃',stars:4,name:'Comida — Passo 1: Só cheirar',desc:'Cheirar um alimento novo sem precisar comer. Só explorar com o nariz!',lua:'Rafael, sabia que o nariz é o melhor explorador do mundo? Ele te avisa sobre tudo antes mesmo de você provar! Hoje o desafio é simples: cheirar um alimento que você não costuma comer. Só isso! Sem pressão para comer. Você é um cientista investigando! 🔬',tip:'💡 Faz assim: aproxima devagarzinho, fecha os olhos, respira. O que o cheiro te lembra?',mama:'Escolha um alimento de textura neutra (maçã, cenoura cozida, arroz). Não force e não demonstre ansiedade. Elogie muito a curiosidade, não o resultado. Pesquisas mostram que crianças com seletividade precisam de 15-20 exposições antes de aceitar um alimento.'},
+  {id:'f2',cat:'🥦 Explorando Alimentos',color:'#43E97B',e:'👆',stars:5,name:'Comida — Passo 2: Tocar e explorar',desc:'Tocar o alimento com o dedo ou garfo. Explorar a textura sem comer!',lua:'Você cheirou e sobreviveu! Agora vamos conhecer melhor: como é a textura? É liso, áspero, mole, firme? Você não precisa comer — só explorar como um cientista! Cada alimento tem uma história pra contar. 🧪',tip:'💡 Descreve o que sente: "É frio", "É escorregadio", "É macio". Falar ajuda o cérebro a entender que é seguro!',mama:'Deixe-o explorar no próprio ritmo. Se ele recuar, tudo bem — elogie a tentativa. Nunca force, nunca disfarce alimentos (isso quebra a confiança). O objetivo é familiaridade, não ingestão.'},
+  {id:'f3',cat:'🥦 Explorando Alimentos',color:'#43E97B',e:'👅',stars:7,name:'Comida — Passo 3: Encostar nos lábios',desc:'Encostar o alimento nos lábios. Pode cuspir depois — sem problema!',lua:'Você está indo longe demais! Agora o desafio é: encosta o alimento nos lábios por um segundo. Pode tirar na hora! O seu cérebro está aprendendo que esse alimento é amigo, não inimigo. Cada pequeno passo é uma vitória enorme! 🏆',tip:'💡 Se quiser, fecha os olhos. Algumas pessoas acham mais fácil assim!',mama:'Mantenha o ambiente sem pressão. Se ele encostar e retirar imediatamente, isso já é um sucesso! Celebre: "Você foi incrível!" Nunca diga "Vamos, não é nada" — para ele, é muito.'},
+  {id:'f4',cat:'🥦 Explorando Alimentos',color:'#43E97B',e:'🌟',stars:10,name:'Comida — Passo 4: Uma mordidinha!',desc:'Dar uma pequeníssima mordida em um alimento novo. Pode cuspir se quiser!',lua:'Rafael, isso é ENORME! Uma mordidinha — menor que uma ervilha — já é uma conquista gigante! Seu cérebro está se abrindo para novos sabores. Lembra: você pode cuspir se não gostar. Sem drama, sem julgamento. Só curiosidade! 🌈',tip:'💡 Beba um gole d\'água antes. Ajuda a preparar a boca para o novo sabor!',mama:'CELEBRE MUITO! Isso representa um trabalho enorme de exposição. Se ele cuspir, está tudo bem — não reaja negativamente. Anote o alimento e a reação para acompanhar a evolução. Essa conquista merece uma celebração especial escolhida por ele!'},
+  {id:'f5',cat:'🥦 Explorando Alimentos',color:'#43E97B',e:'🍽️',stars:12,name:'Comida — Grande Conquista!',desc:'Provar e engolir um alimento que antes recusava.',lua:'RAFAEL! Você conseguiu! Sabe o que isso significa? Que você é mais forte que o medo! Seu cérebro aprendeu que aquele alimento é seguro. Isso é ciência acontecendo dentro de você! E sabe o melhor? Agora você tem um alimento novo no seu cardápio! 🎊',tip:'💡 Conta para alguém especial o que você conseguiu hoje! Dividir a conquista faz ela ser ainda maior!',mama:'🏆 MARCO HISTÓRICO! Essa conquista exige reconhecimento especial — deixe-o escolher uma atividade especial como celebração. Documente com foto se ele permitir. E lembre: isso pode não acontecer toda vez, e está tudo bem. O progresso não é linear.'},
 ];
 
 const COURAGE_CATS = [...new Set(COURAGE.map(c=>c.cat))];
@@ -955,36 +1023,44 @@ async function completeCourage(id) {
 //  REWARDS / RATEIO
 // ══════════════════════════════════════════════════════
 function renderRewards() {
-  const goal = S.cfg.goal;
-  const pct = Math.min(100, Math.round(S.moneyStars / goal * 100));
-  const totalMoney = Object.values(S.rateio).reduce((acc, r) => acc + (r.money||0), 0);
+  const r = S.rateio || {};
+  const valorPorEstrela = r.valorPorEstrela || (S.cfg.money / Math.max(calcTotalPossibleStars(),1));
+  const totalMoney = ((r.tasks?.money||0) + (r.tasks?.bonus||0) + (r.courage?.money||0) + (r.feelings?.money||0) + (r.games?.money||0));
+  const totalPoss  = r.totalPossivel || calcTotalPossibleStars();
+  const totalGanho = S.moneyStars || 0;
+  const pct        = Math.min(100, Math.round(totalGanho / Math.max(totalPoss,1) * 100));
 
-  document.getElementById('rw-num').textContent   = S.moneyStars;
+  document.getElementById('rw-num').textContent   = totalGanho;
   document.getElementById('rw-money').textContent = 'R$ ' + totalMoney.toFixed(2).replace('.', ',');
   document.getElementById('rw-pct').textContent   = pct + '%';
   document.getElementById('rw-bar').style.width   = pct + '%';
-  document.getElementById('rw-goal').textContent  = 'Meta: ' + goal + ' ⭐';
+  document.getElementById('rw-goal').textContent  = `Meta: ${totalPoss} ⭐ possíveis`;
   document.getElementById('rateio-total').textContent = 'R$ ' + totalMoney.toFixed(2).replace('.', ',');
 
-  // Rateio detalhado
+  // Explicação do valor por estrela
+  const explEl = document.getElementById('rateio-explain');
+  if (explEl) explEl.textContent = `Cada ⭐ vale R$ ${valorPorEstrela.toFixed(3).replace('.',',')} (R$${S.cfg.money} ÷ ${totalPoss} estrelas possíveis no mês)`;
+
   const cats = [
-    { key:'tasks',    ico:'🏠', name:'Tarefas Domésticas',   color:'#43E97B', mult: S.cfg.taskMult },
-    { key:'courage',  ico:'🦁', name:'Desafios de Coragem',   color:'#b06bff', mult: S.cfg.courageMult },
-    { key:'feelings', ico:'💜', name:'Sessões com a Lua',     color:'#ff6bce', mult: 1 },
-    { key:'games',    ico:'🎮', name:'Jogos Educativos',      color:'#F7971E', mult: 1 },
+    { key:'tasks',    ico:'🏠', name:'Tarefas Domésticas',  color:'#43E97B', mult: S.cfg.taskMult,    poss: r.tasks?.poss||0 },
+    { key:'courage',  ico:'🦁', name:'Desafios de Coragem',  color:'#b06bff', mult: S.cfg.courageMult, poss: r.courage?.poss||0 },
+    { key:'feelings', ico:'💜', name:'Sessões com a Lua',    color:'#ff6bce', mult: 1,                 poss: 32 },
+    { key:'games',    ico:'🎮', name:'Jogos Educativos',     color:'#F7971E', mult: 1,                 poss: 40 },
   ];
-  const maxMoney = Math.max(...cats.map(c => S.rateio[c.key]?.money || 0), 1);
+  const maxMoney = Math.max(...cats.map(c => (r[c.key]?.money||0) + (c.key==='tasks'?r.tasks?.bonus||0:0)), 1);
   document.getElementById('rateio-rows').innerHTML = cats.map(c => {
-    const r = S.rateio[c.key] || { stars:0, money:0 };
-    const barW = Math.round((r.money||0) / maxMoney * 100);
+    const rd    = r[c.key] || { stars:0, money:0 };
+    const bonus = c.key==='tasks' ? (r.tasks?.bonus||0) : 0;
+    const total = (rd.money||0) + bonus;
+    const barW  = Math.round(total / maxMoney * 100);
     return `<div class="rateio-row">
       <div class="rateio-ico">${c.ico}</div>
       <div class="rateio-info">
-        <div class="rateio-name">${c.name} <span style="font-size:.65rem;color:var(--muted);font-weight:600;">×${c.mult}</span></div>
-        <div class="rateio-stars">${r.stars||0} estrelas este mês</div>
+        <div class="rateio-name">${c.name} <span style="font-size:.62rem;color:var(--muted);font-weight:600;">×${c.mult}${bonus>0?' +bônus 100%!':''}</span></div>
+        <div class="rateio-stars">${rd.stars||0} de ${c.poss} estrelas possíveis</div>
         <div class="rateio-bar-wrap"><div class="rateio-bar" style="width:${barW}%;background:${c.color};"></div></div>
       </div>
-      <div class="rateio-val">R$ ${(r.money||0).toFixed(2).replace('.',',')}</div>
+      <div class="rateio-val">R$ ${total.toFixed(2).replace('.',',')}</div>
     </div>`;
   }).join('');
 
@@ -1133,6 +1209,16 @@ function renderMamaContent() {
     <div style="font-family:'Baloo 2',cursive;font-weight:800;font-size:.9rem;margin:12px 0 8px;color:#d4b0ff;">💜 Sessões com a Lua</div>
     ${fl.length===0?'<div style="color:var(--muted);font-size:.8rem;text-align:center;padding:14px;">Nenhuma sessão ainda. Rafael pode iniciar em "Como você está?" na tela inicial! 🌙</div>':
     fl.slice(0,8).map(s=>`<div class="rpt-card"><div class="rpt-hdr"><span style="font-size:.8rem;font-family:'Baloo 2',cursive;font-weight:800;color:#d4b0ff;">📅 ${s.date} às ${s.time}</span>${s.needsAttn?'<span style="background:rgba(255,193,7,.18);border:1px solid rgba(255,193,7,.35);border-radius:50px;padding:2px 8px;font-size:.65rem;font-weight:800;color:#ffe082;">⚠️</span>':''}</div><div class="rpt-body"><div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;"><span style="font-size:1.8rem;">${s.emoji}</span><div><div style="font-weight:800;font-size:.88rem;">Sentimento: <b>${s.feelingLabel}</b></div><div style="font-size:.7rem;color:var(--muted);font-weight:600;">Intensidade: ${s.intensity==='low'?'😌 Pouquinho':s.intensity==='mid'?'😟 Médio':'😰 Muito forte'}</div></div></div><span class="rtag">📍 ${s.context}</span><div class="rpt-advice" style="margin-top:8px;">💡 ${s.advice}</div>${s.needsAttn?`<div class="rpt-alert">👩 Sentimento muito intenso. Um abraço e conversa aberta podem ajudar muito. 💜</div>`:''}</div></div>`).join('')}
+
+    <div style="font-family:'Baloo 2',cursive;font-weight:800;font-size:.9rem;margin:18px 0 10px;color:#d4b0ff;">🤝 Como fortalecer seu relacionamento com o Rafael</div>
+    <div style="background:rgba(176,107,255,.06);border:1.5px solid rgba(176,107,255,.18);border-radius:14px;padding:14px;margin-bottom:8px;font-size:.78rem;color:#d4b0ff;font-weight:600;line-height:1.5;">
+      💜 Estas dicas são baseadas em psicologia infantil e apego seguro. Pequenas mudanças no dia a dia criam conexões enormes.
+    </div>
+    ${MAMA_RELATIONSHIP_TIPS.map(t=>`
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;gap:11px;align-items:flex-start;">
+        <span style="font-size:1.5rem;flex-shrink:0;">${t.ico}</span>
+        <div style="font-size:.78rem;color:var(--txt);font-weight:600;line-height:1.55;">${t.tip}</div>
+      </div>`).join('')}
   `;
 }
 
@@ -1150,30 +1236,51 @@ const FEELINGS = [
   {e:'😔',label:'Chateado', tag:'Chateado', color:'#7B8DB0'},
 ];
 const LUA_ADVICE = {
-  'Feliz':   'Quando estiver feliz, compartilhe essa energia com as pessoas que você ama! A alegria cresce quando dividida. 🌟',
-  'Triste':  'Quando estiver triste, peça um abraço para a mamãe. Chorar faz parte — não há nada de errado nisso. 💙',
-  'Bravo':   'Quando a raiva aparecer, respira fundo 3 vezes antes de falar. Isso ajuda o cérebro a pensar melhor. 🌬️',
-  'Com medo':'O medo avisa que algo nos preocupa. Conta para a mamãe — ela pode te ajudar a se sentir mais seguro. 🛡️',
-  'Calmo':   'A calma é um superpoder! Guarda esse sentimento fazendo algo que você ama quando estiver ansioso. 🌿',
-  'Confuso': 'Quando tudo parecer confuso, desenha o que está sentindo. Isso ajuda a organizar os pensamentos! ✏️',
-  'Animado': 'Que energia boa! Usa essa animação para aprender algo novo ou fazer alguém feliz hoje! ⚡',
-  'Chateado':'Ficar chateado faz parte. Tenta falar com a mamãe — isso alivia muito o coração. 🫂',
+  'Feliz':   'Quando estiver feliz, compartilhe essa energia! Ligue para um amigo, faça algo legal com a mamãe ou escreva o que aconteceu. Felicidade compartilhada multiplica! 🌟',
+  'Triste':  'Tristeza é um sentimento válido e importante. Quando vier, tenta falar com a mamãe — não precisa nem explicar tudo, às vezes um abraço já resolve. E choro não é fraqueza, é coragem. 💙',
+  'Bravo':   'Raiva avisa que algo não está certo. Antes de agir, tenta: 1) respira fundo 5 vezes, 2) bebe água, 3) sai do ambiente por 2 minutos. Depois, com a cabeça mais fria, conversa sobre o que aconteceu. 🌬️',
+  'Com medo':'Todo mundo tem medo de algo — até os adultos! O segredo é não deixar o medo mandar em você. Fala para a mamãe o que te assusta. Juntos vocês são mais fortes que qualquer medo. 🛡️',
+  'Calmo':   'A calma é um superpoder rarísssimo! Quando estiver assim, aproveite para fazer algo que exige concentração: desenhar, ler, montar algo. Esse estado é precioso! 🌿',
+  'Confuso': 'Confusão acontece quando temos muitos pensamentos ao mesmo tempo. Tenta escrever ou desenhar o que está sentindo — coloca tudo para fora do seu cabeça e no papel. Fica mais fácil! ✏️',
+  'Animado': 'Energia boa merece ser usada bem! Usa esse pique para fazer algo que você vinha adiando, ou para fazer alguém feliz. Energia animada é combustível para realizações! ⚡',
+  'Chateado':'Chateação costuma ter uma causa específica. Tenta identificar: foi algo que alguém disse? Algo que não aconteceu como esperava? Nomear o problema já é metade da solução. 🫂',
 };
+
 const LUA_AFTER = {
-  'Feliz':   'Que maravilha! Fico muito feliz que você esteja bem! 😄 O que aconteceu de legal hoje?',
-  'Triste':  'Tudo bem ficar triste às vezes. Eu te ouço. 💙 Pode me contar o que te deixou assim?',
-  'Bravo':   'Entendo! Às vezes a gente fica bravo mesmo. Respira fundo... O que aconteceu?',
-  'Com medo':'Não precisa ter medo, eu estou aqui! 🤗 O que te assustou?',
-  'Calmo':   'Que legal estar calmo! Isso é ótimo para o coração. 🌿 Como foi seu dia?',
-  'Confuso': 'Às vezes a vida parece complicada. Mas juntos entendemos! O que te deixou confuso?',
-  'Animado': 'Uau, que energia! 🤩 Me conta o que está te deixando assim!',
-  'Chateado':'Sinto muito que esteja chateado. 🫂 Quer me contar o que aconteceu?',
+  'Feliz':   'Que ótimo! Com 10 anos, tem muita coisa boa acontecendo. O que foi o melhor momento de hoje?',
+  'Triste':  'Obrigada por me contar. Com sua idade, às vezes a gente se sente assim sem saber bem por quê, e tudo bem. O que mais está pesando agora?',
+  'Bravo':   'Entendo. Raiva é um sentimento forte, mas você sabe lidar com ele. Você consegue me contar o que aconteceu?',
+  'Com medo':'Couragem não é não ter medo — é agir mesmo com medo. Você já está sendo corajoso ao falar sobre isso. O que te assustou?',
+  'Calmo':   'Que delícia estar calmo! Aproveite esse momento. Como foi seu dia hoje?',
+  'Confuso': 'Às vezes muitas coisas ao mesmo tempo deixam a cabeça cheia. Vamos desembaraçar isso juntos. O que está te confundindo mais?',
+  'Animado': 'Adoro sua energia! O que está te deixando tão animado assim?',
+  'Chateado':'Sinto muito que esteja assim. Você pode me contar o que aconteceu, mesmo que seja difícil de explicar?',
 };
+
 const LUA_INT = {
-  low: 'Ainda bem que é pouquinho! Falar sobre isso já é um grande passo. 🌱',
-  mid: 'Entendo... Às vezes esse sentimento cresce. Mas falar sobre ele já ajuda muito! 💬',
-  high:'Isso parece pesado de carregar. Fico feliz que você me contou. Você não está sozinho! 🫂',
+  low: 'Ainda bem! Mas mesmo sendo pouquinho, você fez bem em notar e falar sobre isso. Isso é autoconhecimento! 🌱',
+  mid: 'Entendo. Sentimentos médios às vezes são os mais difíceis porque a gente não sabe se deve falar ou segurar. Você fez certo em me contar! 💬',
+  high:'Isso é muito para carregar sozinho. Fico muito feliz que você me contou. E quero que você saiba: a mamãe também quer te ouvir. Você não precisa ficar com isso dentro. 🫂',
 };
+
+// Perguntas de acompanhamento específicas para Rafael
+const LUA_FOLLOWUP = {
+  banheiro: '🚽 Uma coisinha: você foi ao banheiro hoje quando sentiu vontade, sem segurar muito?',
+  comida:   '🥦 Sobre comida: você experimentou ou tocou algum alimento diferente hoje?',
+  movimento:'🏃 Sobre se mexer: você fez alguma coisa ativa hoje, mesmo que pequena?',
+};
+
+// Dicas de relacionamento para a mamãe (aparece no painel)
+const MAMA_RELATIONSHIP_TIPS = [
+  { ico:'🤝', tip:'Conexão antes de correção: antes de corrigir um comportamento do Rafael, conecte-se emocionalmente primeiro. "Eu vi que você ficou chateado" antes de "Você não devia ter feito isso".' },
+  { ico:'🎮', tip:'10 minutos por dia de atenção total: sem celular, sem tarefas — só você e ele fazendo o que ELE quiser. Pesquisas mostram que isso transforma relacionamentos em semanas.' },
+  { ico:'👂', tip:'Validar antes de resolver: quando ele reclama de algo, primeiro diga "Entendo que isso te chateou" — antes de oferecer soluções. Crianças precisam ser ouvidas antes de serem ajudadas.' },
+  { ico:'🌟', tip:'Elogio específico funciona melhor: em vez de "parabéns!", tente "Eu reparei que você ficou 10 minutos tentando — isso é persistência de verdade!" Elogios específicos constroem autoestima real.' },
+  { ico:'😤', tip:'Sobre birras e recusas: com 10 anos, o Rafael está testando autonomia — isso é saudável! Ofereça escolhas dentro de limites: "Você vai ao banheiro agora ou em 5 minutos?" em vez de "Vai agora!".' },
+  { ico:'🍽️', tip:'Sobre a comida: NUNCA force, negoceie, disfarce ou dê atenção negativa à recusa alimentar. A pressão aumenta a seletividade. Exponha repetidamente sem pressão — a aceitação vem com o tempo.' },
+  { ico:'💜', tip:'Sobre os medos: valide o medo antes de minimizá-lo. "Eu sei que parece assustador para você" é muito mais eficaz que "Não tem nada de errado com isso". O medo é real para ele.' },
+  { ico:'🤗', tip:'Toque intencional: crianças que recebem abraços e toque gentil diariamente têm menos ansiedade. Pergunte sempre antes de tocar nas áreas sensíveis — isso constrói confiança.' },
+];
 let feelSt = { step:0, feeling:null, emoji:null, intensity:null, context:'' };
 function startFeelings() { feelSt={step:0,feeling:null,emoji:null,intensity:null,context:''}; renderFeelStep(); }
 function renderFeelStep() {
@@ -1186,7 +1293,18 @@ function renderFeelStep() {
   else if(s===1){el.innerHTML=`<div class="lua-bub"><div class="lua-txt">Hoje, como você está se sentindo? Escolhe o que mais combina! 👇</div></div><div class="feel-grid">${FEELINGS.map(f=>`<button class="felbtn" onclick="selectFeeling('${f.label}','${f.e}')" style="${feelSt.feeling===f.label?`border-color:${f.color};background:rgba(255,255,255,.08);`:''}"><span class="fe">${f.e}</span><span class="fl">${f.label}</span></button>`).join('')}</div>`;}
   else if(s===2){el.innerHTML=`<div style="background:rgba(108,99,255,.2);border-radius:12px;padding:9px 13px;margin-bottom:10px;font-size:.86rem;font-weight:700;text-align:right;color:#d0c8ff;">${feelSt.emoji} Me sinto <b>${feelSt.feeling}</b></div><div class="lua-bub"><div class="lua-nm">🌙 LUA</div><div class="lua-txt">${LUA_AFTER[feelSt.feeling]||'Me conta mais...'}</div></div><div style="margin-top:4px;">${[{i:'🏫',l:'Na escola / nas aulas'},{i:'🏠',l:'Em casa / com a família'},{i:'👫',l:'Com meus amigos'},{i:'😴',l:'Comigo mesmo'},{i:'🌀',l:'Não sei ainda'}].map(c=>`<button class="ctx-btn" onclick="selectCtx('${c.l}')"><span style="font-size:1.3rem;">${c.i}</span>${c.l}</button>`).join('')}</div>`;}
   else if(s===3){el.innerHTML=`<div style="background:rgba(255,255,255,.04);border-radius:11px;padding:8px 12px;margin-bottom:10px;font-size:.82rem;font-weight:700;text-align:right;color:#d0c8ff;">📍 ${feelSt.context}</div><div class="lua-bub"><div class="lua-nm">🌙 LUA</div><div class="lua-txt">Obrigada por me contar! E esse sentimento está dentro de você muito forte ou só um pouquinho?</div></div><div class="int-row"><button class="ibtn${feelSt.intensity==='low'?' on':''}" onclick="selectInt('low')">😌 Pouquinho</button><button class="ibtn${feelSt.intensity==='mid'?' on':''}" onclick="selectInt('mid')">😟 Médio</button><button class="ibtn${feelSt.intensity==='high'?' on':''}" onclick="selectInt('high')">😰 Muito forte</button></div>`;}
-  else if(s===4){const advice=LUA_ADVICE[feelSt.feeling]||'Você é incrível por compartilhar seus sentimentos! 💜';el.innerHTML=`<div class="lua-bub"><div class="lua-nm">🌙 LUA</div><div class="lua-txt">${LUA_INT[feelSt.intensity]}<br><br>Deixa eu te dar um conselho especial... 💜<br><br><span style="color:#c4ffd4;font-style:italic;">${advice}</span></div></div><button onclick="feelNext()" style="width:100%;background:linear-gradient(135deg,var(--lua),var(--lua2));border:none;border-radius:13px;padding:12px;color:#fff;font-family:'Baloo 2',cursive;font-weight:800;font-size:.92rem;cursor:pointer;margin-top:10px;">Entendi! Obrigado, Lua 💜</button>`;}
+  else if(s===4){
+    const advice=LUA_ADVICE[feelSt.feeling]||'Você é incrível por compartilhar seus sentimentos! 💜';
+    const fqs=[LUA_FOLLOWUP.banheiro,LUA_FOLLOWUP.comida,LUA_FOLLOWUP.movimento];
+    const fq=fqs[Math.floor(Math.random()*fqs.length)];
+    feelSt.followupQ=fq;
+    el.innerHTML=`<div class="lua-bub"><div class="lua-nm">🌙 LUA</div><div class="lua-txt">${LUA_INT[feelSt.intensity]}<br><br>Deixa eu te dar um conselho especial... 💜<br><br><span style="color:#c4ffd4;font-style:italic;">${advice}</span></div></div>
+    <div class="lua-bub" style="margin-top:8px;"><div class="lua-nm">🌙 LUA — Perguntinha extra</div><div class="lua-txt">${fq}</div></div>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="ctx-btn" onclick="feelSt.followupAns='sim';feelNext()" style="color:#43E97B;border-color:rgba(67,233,123,.3);flex:1;justify-content:center;">✅ Sim!</button>
+      <button class="ctx-btn" onclick="feelSt.followupAns='nao';feelNext()" style="color:var(--muted);flex:1;justify-content:center;">Ainda não</button>
+    </div>`;
+  }
   else if(s===5){const f=FEELINGS.find(x=>x.label===feelSt.feeling)||FEELINGS[0];saveFeel();el.innerHTML=`<div style="text-align:center;"><div style="font-size:3.5rem;margin-bottom:8px;">${f.e}</div><div style="font-family:'Baloo 2',cursive;font-size:1.2rem;font-weight:900;color:#d4b0ff;margin-bottom:5px;">Sessão concluída! 🌟</div><div style="color:var(--muted);font-size:.8rem;font-weight:600;line-height:1.5;margin-bottom:13px;">Obrigada por confiar em mim hoje, Rafael. Você foi muito corajoso!<br><br><b style="color:#d4b0ff;">Você nunca está sozinho.</b> 💜</div><div class="info-banner info-green" style="margin-bottom:13px;"><span>✅</span><div>Sessão salva para a mamãe ver com carinho!</div></div><button onclick="finishFeelings()" style="width:100%;background:linear-gradient(135deg,var(--lua),var(--lua2));border:none;border-radius:13px;padding:12px;color:#fff;font-family:'Baloo 2',cursive;font-weight:800;font-size:.92rem;cursor:pointer;">⭐ Terminar e ganhar estrelas!</button></div>`;}
 }
 function selectFeeling(label,emoji){feelSt.feeling=label;feelSt.emoji=emoji;feelNext();}
@@ -1195,8 +1313,14 @@ function selectInt(l){feelSt.intensity=l;feelNext();}
 function feelNext(){feelSt.step++;renderFeelStep();}
 async function saveFeel(){
   const f=FEELINGS.find(x=>x.label===feelSt.feeling)||FEELINGS[0];
-  const session={feeling:f.tag,feeling_label:f.label,emoji:f.e,intensity:feelSt.intensity||'low',context:feelSt.context||'Não informado',advice:LUA_ADVICE[feelSt.feeling]||'',needs_attention:feelSt.intensity==='high'&&['Triste','Bravo','Com medo','Chateado'].includes(feelSt.feeling)};
-  S.feelLog.unshift({date:new Date().toLocaleDateString('pt-BR'),time:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),feeling:f.tag,feelingLabel:f.label,emoji:f.e,intensity:session.intensity,context:session.context,advice:session.advice,needsAttn:session.needs_attention});
+  const session={feeling:f.tag,feeling_label:f.label,emoji:f.e,intensity:feelSt.intensity||'low',
+    context:feelSt.context||'Não informado',advice:LUA_ADVICE[feelSt.feeling]||'',
+    needs_attention:feelSt.intensity==='high'&&['Triste','Bravo','Com medo','Chateado'].includes(feelSt.feeling)};
+  S.feelLog.unshift({date:new Date().toLocaleDateString('pt-BR'),
+    time:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),
+    feeling:f.tag,feelingLabel:f.label,emoji:f.e,intensity:session.intensity,
+    context:session.context,advice:session.advice,needsAttn:session.needs_attention,
+    followupQ:feelSt.followupQ||'',followupAns:feelSt.followupAns||''});
   if(SB){await SB.from('rafael_feel_sessions').insert(session);}
 }
 async function finishFeelings(){
@@ -1267,9 +1391,29 @@ function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t
 function spawnFX(){for(let i=0;i<7;i++){const s=document.createElement('div');s.className='sfx';s.textContent='⭐';const tx=(Math.random()-.5)*220,ty=-(Math.random()*200+60);s.style.cssText=`left:${25+Math.random()*50}%;top:40%;--tx:${tx}px;--ty:${ty}px;animation-delay:${i*0.07}s;`;document.body.appendChild(s);setTimeout(()=>s.remove(),1000);}}
 
 // ══════════════════════════════════════════════════════
-//  BOOT
+//  LOGIN
 // ══════════════════════════════════════════════════════
-window.addEventListener('DOMContentLoaded', async () => {
+const APP_PASSWORD = 'rafael2025'; // ← mude aqui para trocar a senha
+
+function doLogin() {
+  const pwd = document.getElementById('login-pwd').value;
+  if (pwd === APP_PASSWORD) {
+    localStorage.setItem('app_auth', 'ok');
+    document.getElementById('login-screen').style.display = 'none';
+    bootApp();
+  } else {
+    const box = document.querySelector('.login-box');
+    const err = document.getElementById('login-err');
+    err.style.display = 'block';
+    document.getElementById('login-pwd').value = '';
+    box.classList.remove('login-shake');
+    void box.offsetWidth; // reflow para reiniciar animação
+    box.classList.add('login-shake');
+    setTimeout(() => box.classList.remove('login-shake'), 400);
+  }
+}
+
+async function bootApp() {
   const savedUrl = localStorage.getItem('sb_url');
   const savedKey = localStorage.getItem('sb_key');
   if (savedUrl && savedKey) {
@@ -1279,6 +1423,18 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('loading').style.display = 'none';
     document.getElementById('setup-screen').style.display = 'flex';
   }
+}
+
+// ══════════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  // Verifica se já está logado nessa sessão
+  if (localStorage.getItem('app_auth') === 'ok') {
+    document.getElementById('login-screen').style.display = 'none';
+    bootApp();
+  }
+  // Se não, a tela de login já aparece por padrão
 });
 </script>
 </body>
